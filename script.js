@@ -1,7 +1,20 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { 
+  getFirestore, 
+  collection, 
+  getDocs, 
+  addDoc,
+  doc,
+  getDoc
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
+import { 
+  getAuth, 
+  onAuthStateChanged,
+  signOut
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+/* CONFIG FIREBASE */
 const firebaseConfig = {
   apiKey:  "AIzaSyAdDrbZHf93zdvY3TqdUYkqTcFOJmJhLw4",
   authDomain:  "rastreamento-ad456.firebaseapp.com",
@@ -13,14 +26,58 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-let clienteAtual = null;
+/* 🔥 GERAR ID DO DISPOSITIVO */
+function getDeviceId(){
+  let id = localStorage.getItem("deviceId");
 
-/* 🔐 BLOQUEIO SEM LOGIN */
-onAuthStateChanged(auth, (user) => {
+  if(!id){
+    id = "dev-" + Math.random().toString(36).substring(2);
+    localStorage.setItem("deviceId", id);
+  }
+
+  return id;
+}
+
+/* 🔐 PROTEÇÃO COM BLOQUEIO DE DISPOSITIVO */
+onAuthStateChanged(auth, async (user) => {
+
   if (!user) {
     window.location.href = "index.html";
+    return;
   }
+
+  try {
+
+    const deviceId = getDeviceId();
+
+    const empresaRef = doc(db, "empresas", user.uid);
+    const empresaSnap = await getDoc(empresaRef);
+
+    if (!empresaSnap.exists()) {
+      window.location.href = "index.html";
+      return;
+    }
+
+    const dados = empresaSnap.data();
+
+    // 🔥 BLOQUEIO REAL
+    if (dados.deviceId !== deviceId) {
+      alert("Esse acesso não é permitido nesse dispositivo ❌");
+      await signOut(auth);
+      window.location.href = "index.html";
+      return;
+    }
+
+    // ✅ permitido continuar
+
+  } catch (erro) {
+    console.error(erro);
+    window.location.href = "index.html";
+  }
+
 });
+
+let clienteAtual = null;
 
 /* ===== ELEMENTOS ===== */
 const estadoInput = document.getElementById("estado");
@@ -71,9 +128,7 @@ numeros.forEach((input, index) => {
 /* ===== GERAR CODIGO ===== */
 function pegarCodigo(){
   const estado = estadoInput.value;
-
   const nums = numeros.map(n => n.value).join("");
-
   return estado + "-" + nums;
 }
 
@@ -84,7 +139,6 @@ window.buscar = async function(){
   const msg = document.getElementById("msg");
   const card = document.getElementById("card");
 
-  // validação mais forte
   if (!estadoInput.value || codigo.length < 9) {
     msg.innerText = "Digite o código completo ❗";
     card.style.display = "none";
@@ -101,7 +155,6 @@ window.buscar = async function(){
 
     snapshot.forEach(doc => {
       const dados = doc.data();
-
       if (dados.id === codigo) {
         clienteAtual = dados;
       }
@@ -114,7 +167,6 @@ window.buscar = async function(){
 
     msg.innerText = "";
 
-    // ===== MOSTRAR DADOS =====
     const nome = document.getElementById("nome");
     const statusEl = document.getElementById("status");
     const id = document.getElementById("id");
@@ -123,7 +175,6 @@ window.buscar = async function(){
     nome.innerText = clienteAtual.nome || "Sem nome";
     id.innerText = clienteAtual.id || "Sem ID";
 
-    // STATUS COLORIDO
     if (clienteAtual.status === "ativo") {
       statusEl.innerText = "Ativo";
       statusEl.className = "status ativo";
@@ -134,8 +185,7 @@ window.buscar = async function(){
 
     foto.src = clienteAtual.foto || "https://via.placeholder.com/90";
 
-    // ANIMAÇÃO
-   card.style.display = "block";
+    card.style.display = "block";
     card.style.opacity = "0";
 
     setTimeout(() => {
@@ -169,18 +219,18 @@ window.validar = async function(){
 
   try {
     await addDoc(collection(db, "registros"), {
-  clienteId: clienteAtual.id,
-  empresa: user.email,
-  data: agora.toLocaleDateString(),
-  hora: agora.toLocaleTimeString(),
-  timestamp: Date.now() // 🔥 AQUI
-});
+      clienteId: clienteAtual.id,
+      empresa: user.email,
+      data: agora.toLocaleDateString(),
+      hora: agora.toLocaleTimeString(),
+      timestamp: Date.now()
+    });
 
     document.getElementById("sucesso").style.display = "block";
-document.querySelector(".codigo").style.display = "none";
-document.querySelector(".btn").style.display = "none";
-document.getElementById("card").style.display = "none";
-document.getElementById("estado").focus();
+    document.querySelector(".codigo").style.display = "none";
+    document.querySelector(".btn").style.display = "none";
+    document.getElementById("card").style.display = "none";
+    document.getElementById("estado").focus();
 
   } catch (erro) {
     console.error(erro);
@@ -191,7 +241,6 @@ document.getElementById("estado").focus();
 /* ===== VOLTAR ===== */
 window.voltar = function(){
 
-  // 🔄 LIMPAR INPUTS
   document.getElementById("estado").value = "";
 
   document.getElementById("c1").value = "";
@@ -201,22 +250,15 @@ window.voltar = function(){
   document.getElementById("c5").value = "";
   document.getElementById("c6").value = "";
 
-  // 🔄 LIMPAR RESULTADO
   document.getElementById("msg").innerText = "";
 
-  // 🔄 ESCONDER CARD
   document.getElementById("card").style.display = "none";
-
-  // 🔄 ESCONDER TELA DE SUCESSO
   document.getElementById("sucesso").style.display = "none";
 
-  // 🔄 MOSTRAR ÁREA NORMAL
   document.querySelector(".codigo").style.display = "flex";
   document.querySelector(".btn").style.display = "inline-block";
 
-  // 🔥 RESETAR CLIENTE
   clienteAtual = null;
 
-  // 🔥 FOCO NO PRIMEIRO CAMPO
   document.getElementById("estado").focus();
 };
