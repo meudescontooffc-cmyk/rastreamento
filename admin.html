@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ADM</title>
+
+<link rel="stylesheet" href="admin.css">
+</head>
+
+<body>
+
+<h2>Painel ADM</h2>
+
+<!-- BUSCA -->
+<div class="codigo">
+
+  <div class="estado-box">
+    <input id="estado" maxlength="2" placeholder="UF" autocomplete="off">
+    <select id="listaEstados">
+      <option value="">UF</option>
+      <option>MA</option>
+      <option>SP</option>
+      <option>RJ</option>
+      <option>CE</option>
+    </select>
+  </div>
+
+  <span class="traco">-</span>
+
+  <input id="c1" maxlength="1" inputmode="numeric">
+  <input id="c2" maxlength="1" inputmode="numeric">
+  <input id="c3" maxlength="1" inputmode="numeric">
+  <input id="c4" maxlength="1" inputmode="numeric">
+  <input id="c5" maxlength="1" inputmode="numeric">
+  <input id="c6" maxlength="1" inputmode="numeric">
+
+</div>
+
+<button class="btn" onclick="buscar()">Procurar usuário</button>
+
+<div class="linha"></div>
+
+<!-- MENU DESLIZANTE (AGORA É FILTRO) -->
+<div class="menu-scroll">
+
+  <button class="btn-menu" onclick="verAtivos()">Ativos</button>
+  <button class="btn-menu" onclick="verInativos()">Inativos</button>
+  <button class="btn-menu" onclick="verValidacoes()">Validações</button>
+  <button class="btn-menu" onclick="gerarCodigo()">Gerar Código</button>
+  <button class="btn-menu" onclick="listarClientes()">Todos</button>
+
+</div>
+
+<!-- LISTA -->
+<div id="lista"></div>
+
+<script type="module" src="admin.js"></script>
+
+</body>
+</html>
