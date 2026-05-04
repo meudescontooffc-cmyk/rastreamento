@@ -2,109 +2,256 @@
 <html lang="pt-br">
 <head>
 <meta charset="UTF-8">
-
-<!-- RESPONSIVO CORRETO -->
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <title>Painel Empresa</title>
-
 <link rel="stylesheet" href="style.css">
-
 </head>
 
 <body>
-<button onclick="sair()" class="btn">Sair</button>
+
+<!-- SAIR -->
+<button onclick="sair()" class="voltar">← Sair</button>
+
 <h2>Procurar Usuário</h2>
 
-<div class="codigo">
+<!-- BUSCA -->
+<section class="codigo">
 
-  <!-- ESTADO -->
   <div class="estado-box">
-
-    <input 
-      id="estado" 
-      maxlength="2" 
-      placeholder="UF"
-      autocomplete="off"
-      inputmode="text"
-    >
-
     <select id="listaEstados">
       <option value="">UF</option>
-      <option>AC</option>
-      <option>AL</option>
-      <option>AP</option>
-      <option>AM</option>
-      <option>BA</option>
-      <option>CE</option>
-      <option>DF</option>
-      <option>ES</option>
-      <option>GO</option>
-      <option>MA</option>
-      <option>MT</option>
-      <option>MS</option>
-      <option>MG</option>
-      <option>PA</option>
-      <option>PB</option>
-      <option>PR</option>
-      <option>PE</option>
-      <option>PI</option>
-      <option>RJ</option>
-      <option>RN</option>
-      <option>RS</option>
-      <option>RO</option>
-      <option>RR</option>
-      <option>SC</option>
-      <option>SP</option>
-      <option>SE</option>
-      <option>TO</option>
+      <option value="MA">MA</option>
+      <option value="RJ">RJ</option>
+      <option value="MG">MG</option>
+      <option value="BA">BA</option>
+      <option value="SP">SP</option>
     </select>
-
   </div>
 
   <span class="traco">-</span>
 
-  <!-- NÚMEROS -->
-  <input id="c1" maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
-  <input id="c2" maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
-  <input id="c3" maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
-  <input id="c4" maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
-  <input id="c5" maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
-  <input id="c6" maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
+  <input id="c1" maxlength="1" inputmode="numeric">
+  <input id="c2" maxlength="1" inputmode="numeric">
+  <input id="c3" maxlength="1" inputmode="numeric">
+  <input id="c4" maxlength="1" inputmode="numeric">
+  <input id="c5" maxlength="1" inputmode="numeric">
+  <input id="c6" maxlength="1" inputmode="numeric">
 
-</div>
+</section>
 
-<button class="btn" onclick="buscar()">Procurar usuário</button>
+<button class="btn btn-primary" onclick="buscar()">
+  Procurar usuário
+</button>
 
 <div class="linha"></div>
 
-<div id="resultado">
+<!-- ÚLTIMAS VALIDAÇÕES -->
+<section id="ultimasValidacoes" class="ultimos-clientes">
 
-  <p id="msg"></p>
+  <div class="titulo-historico">
+    <h3>Últimas validações</h3>
+    <p>Clientes utilizados recentemente</p>
+  </div>
 
- <div class="card" id="card" style="display:none;">
+  <div id="listaUltimos"></div>
 
-    <div class="card-content">
-      <img id="foto" src="" alt="Foto do cliente" loading="lazy">
+</section>
 
-      <div class="info">
-        <h3 id="nome">Nome</h3>
-        <p id="status" class="status">Status</p>
-        <p id="id">ID</p>
-      </div>
+<!-- MODAL DETALHES -->
+<section id="modalDetalhes" class="modal hidden">
+
+  <div class="modal-box">
+
+    <div class="modal-topo">
+      <h3>Histórico detalhado</h3>
+
+      <button onclick="fecharDetalhes()" class="fechar-modal">
+        ✕
+      </button>
     </div>
 
-    <button class="btn" onclick="validar()">Validar benefício</button>
+    <div id="conteudoDetalhes"></div>
+
+    <!-- VER MAIS -->
+    <div class="mais-box">
+      <button
+        id="btnVerMais"
+        class="btn btn-primary hidden"
+        onclick="verMaisDetalhes()">
+        Ver mais
+      </button>
+    </div>
 
   </div>
 
-</div>
+</section>
 
-<div class="sucesso" id="sucesso" style="display:none;">
-  <h1>Benefício validado ✅</h1>
+<!-- FEEDBACK -->
+<p id="msg" class="msg"></p>
 
-  <button class="btn" onclick="voltar()">Voltar</button>
-</div>
+<!-- RESULTADO -->
+<section id="resultado">
+
+  <div class="card hidden" id="card">
+
+   <!-- SETA VOLTAR -->
+<button onclick="voltarCard()" class="seta-voltar-card">
+  ←
+</button>
+
+    <!-- TOPO -->
+    <div class="card-content">
+
+      <!-- BLOCO FOTO + INFO -->
+      <div class="perfil-box">
+
+        <!-- FOTO -->
+        <img id="foto" src="" alt="Foto do cliente">
+
+        <!-- INFO -->
+        <div class="info">
+          <h3 id="nome">Nome do Cliente</h3>
+          <p id="id">ID: ---</p>
+          <p id="status" class="status ativo">Ativo</p>
+        </div>
+
+      </div>
+
+      <!-- MÉTRICAS -->
+      <div class="metrics">
+
+        <div class="metric destaque">
+          <strong id="totalCompras">R$ 0,00</strong>
+          <span>Total em compras</span>
+        </div>
+
+        <div class="metric">
+          <strong id="usos">0</strong>
+          <span>Utilizações</span>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- VALIDAÇÃO -->
+    <div class="validar-box">
+
+      <h3>🔒 Validar benefício</h3>
+
+      <div class="validar-grid">
+
+        <!-- VALOR -->
+        <div class="campo-box">
+          <label for="valor">Valor da venda</label>
+
+          <input
+            id="valor"
+            type="text"
+            placeholder="R$ 0,00"
+            inputmode="numeric">
+        </div>
+
+        <!-- DESCONTO -->
+        <div class="campo-box">
+
+          <label for="tipoDesconto">Desconto</label>
+
+          <div class="select-wrap">
+            <select id="tipoDesconto">
+              <option value="">Selecionar</option>
+              <option value="5">5%</option>
+              <option value="10">10%</option>
+              <option value="15">15%</option>
+              <option value="20">20%</option>
+              <option value="manual">Digitar</option>
+            </select>
+
+            <span class="seta">⌄</span>
+          </div>
+
+          <input
+            id="desconto"
+            type="text"
+            placeholder="00%"
+            class="hidden-input">
+
+        </div>
+
+        <!-- TOTAL -->
+        <div class="campo-box">
+          <label for="total">Total final</label>
+
+          <input
+            id="total"
+            disabled
+            placeholder="R$ 0,00">
+        </div>
+
+      </div>
+
+      <div class="desconto-info" id="infoDesconto">
+        Desconto aplicado: R$ 0,00 (0%)
+      </div>
+
+      <div class="acoes-validar">
+        <button
+          class="btn btn-success"
+          onclick="validar()">
+          Validar
+        </button>
+      </div>
+
+    </div>
+
+    <!-- HISTÓRICO -->
+    <div class="historico-box">
+
+      <table class="tabela">
+
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Hora</th>
+            <th>Valor</th>
+            <th>Desc.</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+
+        <tbody id="listaHistorico">
+          <tr class="empty">
+            <td colspan="5">
+              Nenhum registro encontrado
+            </td>
+          </tr>
+        </tbody>
+
+      </table>
+
+    </div>
+
+  </div>
+
+</section>
+
+<!-- SUCESSO -->
+<section class="sucesso hidden" id="sucesso">
+
+  <div class="sucesso-box">
+
+    <h1>Benefício validado ✅</h1>
+
+    <button
+      class="btn btn-primary"
+      onclick="voltar()">
+      Voltar
+    </button>
+
+  </div>
+
+</section>
 
 <script type="module" src="script.js"></script>
 
