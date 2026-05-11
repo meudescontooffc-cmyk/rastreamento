@@ -1,11 +1,12 @@
 // 🔽 IMPORTS
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-
 import {
   getFirestore,
   collection,
   addDoc,
   getDocs,
+  getDoc,
+  setDoc,
   query,
   where,
   orderBy,
@@ -44,6 +45,49 @@ let tokenBusca = 0;
 
 
 // 🔥 PROTEÇÃO REAL PELO FIREBASE AUTH
+let empresaConfig = {
+  ativarBrinde: true,
+  ativarSorteio: false,
+  metaBrinde: 10,
+  metaSorteio: 10,
+  qtdSorteio: 5
+};
+
+
+// 🔥 BUSCAR CONFIG DA EMPRESA
+async function carregarConfigEmpresa() {
+
+  try {
+
+    const ref = doc(db, "empresas", empresaLogada);
+
+    const snap = await getDoc(ref);
+
+    // 🔥 se já existe config
+    if (snap.exists()) {
+
+      empresaConfig = {
+        ...empresaConfig,
+        ...snap.data()
+      };
+
+    } else {
+
+      // 🔥 cria padrão automática
+      await setDoc(ref, empresaConfig);
+
+    }
+
+  } catch (erro) {
+
+    console.error("Erro config empresa:", erro);
+
+  }
+
+}
+
+
+// 🔐 LOGIN / SESSÃO
 onAuthStateChanged(auth, async (user) => {
 
   if (!user) {
@@ -51,13 +95,24 @@ onAuthStateChanged(auth, async (user) => {
     return;
   }
 
-  // 🔥 AGORA USA UID (mais seguro)
+  // 🔥 UID EMPRESA
   empresaLogada = user.uid;
 
-  await carregarUltimasValidacoes();
+  try {
+
+    // 🔥 carrega config individual
+    await carregarConfigEmpresa();
+
+    // 🔥 carrega painel
+    await carregarUltimasValidacoes();
+
+  } catch (erro) {
+
+    console.error("Erro sessão:", erro);
+
+  }
 
 });
-
 
 // 🚪 SAIR
 window.sair = async () => {
@@ -507,7 +562,8 @@ async function carregarHistorico() {
 
   }
 
-}// 🔥 ÚLTIMAS VALIDAÇÕES
+}
+// 🔥 ÚLTIMAS VALIDAÇÕES + SORTEIO + PRÊMIO
 async function carregarUltimasValidacoes() {
 
   const box = document.getElementById("listaUltimos");
@@ -518,6 +574,25 @@ async function carregarUltimasValidacoes() {
 
   try {
 
+    // 🔥 CONFIG DA EMPRESA
+    const metaBrinde =
+      Number(empresaConfig?.metaBrinde || 10);
+
+    const metaSorteio =
+      Number(empresaConfig?.metaSorteio || 10);
+
+    const qtdSorteio =
+      Number(empresaConfig?.qtdSorteio || 5);
+
+    const ativarBrinde =
+      empresaConfig?.ativarBrinde !== false;
+
+    const ativarSorteio =
+      empresaConfig?.ativarSorteio === true;
+
+    // ==================================================
+    // 🔥 TOP 5 ÚLTIMOS
+    // ==================================================
     const q = query(
       collection(db, "clientesEmpresa"),
       where("empresa", "==", empresaLogada),
@@ -525,7 +600,18 @@ async function carregarUltimasValidacoes() {
       limit(5)
     );
 
+    // ==================================================
+    // 🔥 META CLIENTES
+    // ==================================================
+    const qMeta = query(
+      collection(db, "clientesEmpresa"),
+      where("empresa", "==", empresaLogada),
+      where("usos", ">=", Math.min(metaBrinde, metaSorteio)),
+      orderBy("usos", "desc")
+    );
+
     const snap = await getDocs(q);
+    const snapMeta = await getDocs(qMeta);
 
     if (snap.empty) {
       box.innerHTML = "Nenhuma validação encontrada";
@@ -534,6 +620,103 @@ async function carregarUltimasValidacoes() {
 
     box.innerHTML = "";
 
+    // ==================================================
+    // 🔥 FILTRA CLIENTES
+    // ==================================================
+    const clientesBrinde = [];
+    const clientesSorteio = [];
+
+    snapMeta.forEach((docu) => {
+
+      const d = docu.data();
+
+      if (d.usos >= metaBrinde) {
+        clientesBrinde.push({
+          id: docu.id,
+          ...d
+        });
+      }
+
+      if (d.usos >= metaSorteio) {
+        clientesSorteio.push({
+          id: docu.id,
+          ...d
+        });
+      }
+
+    });
+
+    // ==================================================
+    // 🔥 TOPO - SORTEIO
+    // ==================================================
+    if (
+      ativarSorteio &&
+      clientesSorteio.length >= qtdSorteio
+    ) {
+
+      box.innerHTML += `
+        <div class="card-beneficio card-sorteio">
+
+          <strong>
+            🎉 Sorteio liberado
+          </strong>
+
+          <span>
+            Já existem ${clientesSorteio.length}
+            clientes com ${metaSorteio}
+            compras participando!
+          </span>
+
+        </div>
+      `;
+    }
+
+    // ==================================================
+    // 🔥 TOPO - BRINDES
+    // ==================================================
+    if (ativarBrinde) {
+
+      clientesBrinde.forEach((d) => {
+
+        if (!d.premiado) {
+
+          box.innerHTML += `
+            <div class="card-beneficio">
+
+              <strong>
+                🏆 ${d.nome || d.clienteId}
+              </strong>
+
+              <span>
+                Atingiu ${metaBrinde}
+                compras e pode ganhar prêmio.
+              </span>
+
+              <div style="
+                margin-top:12px;
+              ">
+
+                <button
+                  class="btn btn-primary"
+                  onclick="premiarCliente('${d.id}')">
+
+                  Premiar
+
+                </button>
+
+              </div>
+
+            </div>
+          `;
+        }
+
+      });
+
+    }
+
+    // ==================================================
+    // 🔥 LISTA NORMAL
+    // ==================================================
     snap.forEach((docu) => {
 
       const d = docu.data();
@@ -551,20 +734,36 @@ async function carregarUltimasValidacoes() {
 
             <div class="topo-historico">
 
-              <strong>${d.nome || d.clienteId}</strong>
+              <strong>
+                ${d.nome || d.clienteId}
+              </strong>
 
               <button
                 class="btn-detalhes"
                 onclick="verDetalhes('${d.clienteId}')">
+
                 Ver detalhes
+
               </button>
 
             </div>
 
-            <span>ID: ${d.clienteId || "---"}</span>
-            <span>Total: ${moeda(d.totalGasto || 0)}</span>
-            <span>Usos: ${Number(d.usos || 0)}</span>
-            <span>${dataFormatada} ${horaFormatada}</span>
+            <span>
+              ID: ${d.clienteId || "---"}
+            </span>
+
+            <span>
+              Total: ${moeda(d.totalGasto || 0)}
+            </span>
+
+            <span>
+              Usos: ${Number(d.usos || 0)}
+            </span>
+
+            <span>
+              ${dataFormatada}
+              ${horaFormatada}
+            </span>
 
           </div>
 
@@ -575,15 +774,97 @@ async function carregarUltimasValidacoes() {
 
   } catch (erro) {
 
-    console.error("Erro últimas validações:", erro);
+  console.error("🔥 ERRO COMPLETO:", erro);
 
-    box.innerHTML = "Erro ao carregar";
+  box.innerHTML = `
+    <div style="
+      background: linear-gradient(135deg, #2b0000, #120000);
+      border: 1px solid rgba(255, 0, 0, 0.3);
+      padding: 16px;
+      border-radius: 16px;
+      color: #ff4d4d;
+      font-family: Arial;
+      box-shadow: 0 10px 25px rgba(0,0,0,.4);
+    ">
 
-  }
+      <div style="
+        font-size: 16px;
+        font-weight: bold;
+        margin-bottom: 8px;
+        color: #ff2e2e;
+      ">
+        ⚠️ Falha ao carregar dados
+      </div>
+
+      <div style="
+        font-size: 13px;
+        opacity: .9;
+        margin-bottom: 10px;
+      ">
+        ${erro.message || "Erro desconhecido"}
+      </div>
+
+      <details style="cursor:pointer;">
+        <summary style="color:#ff7a7a; font-size:12px;">
+          Ver detalhes técnicos
+        </summary>
+
+        <pre style="
+          margin-top:10px;
+          font-size:11px;
+          background:#0a0a0a;
+          padding:10px;
+          border-radius:10px;
+          overflow:auto;
+          color:#ffb3b3;
+        ">
+${JSON.stringify(erro, null, 2)}
+        </pre>
+
+      </details>
+
+    </div>
+  `;
+
+}
 
 }
 
 
+
+// 🔥 PREMIAR CLIENTE
+window.premiarCliente = async (docId) => {
+
+  try {
+
+    await updateDoc(
+      doc(db, "clientesEmpresa", docId),
+      {
+        premiado: true,
+        dataPremio: Date.now()
+      }
+    );
+
+    mostrarMensagem(
+      "Cliente premiado"
+    );
+
+    await carregarUltimasValidacoes();
+
+  } catch (erro) {
+
+    console.error(
+      "Erro ao premiar:",
+      erro
+    );
+
+    mostrarMensagem(
+      "Erro ao premiar ❌"
+    );
+
+  }
+
+};
 // 🔍 VER DETALHES
 window.verDetalhes = async (id) => {
 
@@ -803,6 +1084,11 @@ window.validar = async () => {
     return;
   }
 
+  if (!tipoDesconto.value) {
+    mostrarMensagem("Selecione o desconto primeiro ❗");
+    return;
+  }
+
   let valor = valorInput.value
     .replace("R$", "")
     .replace(/\./g, "")
@@ -811,10 +1097,16 @@ window.validar = async () => {
 
   valor = parseFloat(valor || 0);
 
-  const desconto = descontoAtual();
-
   if (!valor || valor <= 0) {
     mostrarMensagem("Digite o valor da venda ❗");
+    return;
+  }
+
+  const desconto = descontoAtual();
+
+  // 🔥 impede desconto inválido
+  if (desconto < 0 || desconto > 100) {
+    mostrarMensagem("Desconto inválido ❗");
     return;
   }
 
@@ -827,6 +1119,8 @@ window.validar = async () => {
   const btn =
     document.querySelector(".btn-success");
 
+  if (btn.disabled) return;
+
   btn.disabled = true;
   btn.innerText = "Validando...";
 
@@ -835,13 +1129,15 @@ window.validar = async () => {
 
   try {
 
+    // ==================================================
     // 🔥 SALVA VALIDAÇÃO
+    // ==================================================
     await addDoc(
       collection(db, "validacoes"),
       {
         clienteId: clienteAtual.id,
         clienteNome: clienteAtual.nome || "",
-        empresa: empresaLogada, // UID
+        empresa: empresaLogada,
         valor,
         desconto,
         total,
@@ -851,8 +1147,15 @@ window.validar = async () => {
       }
     );
 
+    // ==================================================
     // 🔥 CLIENTE X EMPRESA
+    // ==================================================
+    let usosAtual = 1;
+
     if (dadosEmpresaCliente?.docId) {
+
+      usosAtual =
+        Number(dadosEmpresaCliente.usos || 0) + 1;
 
       await updateDoc(
         doc(
@@ -875,15 +1178,18 @@ window.validar = async () => {
 
     } else {
 
+      usosAtual = 1;
+
       await addDoc(
         collection(db, "clientesEmpresa"),
         {
           clienteId: clienteAtual.id,
-          empresa: empresaLogada, // UID
+          empresa: empresaLogada,
           nome: clienteAtual.nome || "",
           foto: clienteAtual.foto || "",
           totalGasto: total,
           usos: 1,
+          brindesEntregues: 0,
           ultimaValidacao: agoraMs,
           ultimaData:
             agora.toLocaleDateString("pt-BR"),
@@ -894,12 +1200,25 @@ window.validar = async () => {
 
     }
 
+    // ==================================================
+    // 🔥 ALERTA A CADA 10 COMPRAS
+    // ==================================================
+    if (usosAtual % 10 === 0) {
+
+      mostrarMensagem(
+        `🎁 ${clienteAtual.nome || "Cliente"} atingiu ${usosAtual} compras e ganhou brinde!`
+      );
+
+    }
+
     await carregarUltimasValidacoes();
 
+    // ==================================================
+    // 🔥 FECHA CARD
+    // ==================================================
     card.classList.remove("show");
     card.classList.add("hidden");
 
-    // 🔥 ESCONDE TELA PRINCIPAL
     document.getElementById("resultado").style.display = "none";
     document.getElementById("ultimasValidacoes").style.display = "none";
 
@@ -921,7 +1240,9 @@ window.validar = async () => {
       botoesPrimarios[0].style.display = "none";
     }
 
+    // ==================================================
     // 🔥 MOSTRA SUCESSO
+    // ==================================================
     setTimeout(() => {
 
       sucesso.classList.remove("hidden");
@@ -949,7 +1270,6 @@ window.validar = async () => {
   }
 
 };
-
 
 // 🔄 VOLTAR
 window.voltar = async () => {
@@ -1076,3 +1396,95 @@ function limparCampos() {
     "Desconto aplicado: R$ 0,00 (0%)";
 
 }
+
+// ==================================================
+// ⚙️ CONFIG EMPRESA
+// ==================================================
+
+window.abrirConfigEmpresa = () => {
+
+  const modal =
+    document.getElementById("modalConfigEmpresa");
+
+  if (!modal) return;
+
+  modal.classList.remove("hidden");
+  modal.classList.add("show");
+
+  document.getElementById("cfgBrinde").value =
+    String(empresaConfig.ativarBrinde);
+
+  document.getElementById("cfgSorteio").value =
+    String(empresaConfig.ativarSorteio);
+
+  document.getElementById("cfgMetaBrinde").value =
+    empresaConfig.metaBrinde || 10;
+
+  document.getElementById("cfgMetaSorteio").value =
+    empresaConfig.metaSorteio || 10;
+
+  document.getElementById("cfgQtdSorteio").value =
+    empresaConfig.qtdSorteio || 5;
+
+};
+
+
+window.fecharConfigEmpresa = () => {
+
+  const modal =
+    document.getElementById("modalConfigEmpresa");
+
+  if (!modal) return;
+
+  modal.classList.remove("show");
+  modal.classList.add("hidden");
+
+};
+
+
+// ==================================================
+// 💾 SALVAR CONFIG
+// ==================================================
+
+window.salvarConfigEmpresa = async () => {
+
+  try {
+
+    empresaConfig = {
+      ativarBrinde:
+        document.getElementById("cfgBrinde").value === "true",
+
+      ativarSorteio:
+        document.getElementById("cfgSorteio").value === "true",
+
+      metaBrinde:
+        Number(document.getElementById("cfgMetaBrinde").value || 10),
+
+      metaSorteio:
+        Number(document.getElementById("cfgMetaSorteio").value || 10),
+
+      qtdSorteio:
+        Number(document.getElementById("cfgQtdSorteio").value || 5)
+    };
+
+    await setDoc(
+      doc(db, "empresas", empresaLogada),
+      empresaConfig,
+      { merge:true }
+    );
+
+    mostrarMensagem("Configurações salvas ✅");
+
+    fecharConfigEmpresa();
+
+    await carregarUltimasValidacoes();
+
+  } catch (erro) {
+
+    console.error("Erro config:", erro);
+
+    mostrarMensagem("Erro ao salvar ❌");
+
+  }
+
+};
