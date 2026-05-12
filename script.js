@@ -562,8 +562,7 @@ async function carregarHistorico() {
 
   }
 
-}
-// 🔥 ÚLTIMAS VALIDAÇÕES + SORTEIO + PRÊMIO
+}/// 🔥 ÚLTIMAS VALIDAÇÕES + SORTEIO + TOPO CORRETO
 async function carregarUltimasValidacoes() {
 
   const box = document.getElementById("listaUltimos");
@@ -574,44 +573,20 @@ async function carregarUltimasValidacoes() {
 
   try {
 
-    // 🔥 CONFIG DA EMPRESA
-    const metaBrinde =
-      Number(empresaConfig?.metaBrinde || 10);
+    const metaBrinde = Number(empresaConfig?.metaBrinde || 10);
+    const metaSorteio = Number(empresaConfig?.metaSorteio || 10);
+    const qtdSorteio = Number(empresaConfig?.qtdSorteio || 5);
 
-    const metaSorteio =
-      Number(empresaConfig?.metaSorteio || 10);
+    const ativarBrinde = empresaConfig?.ativarBrinde !== false;
+    const ativarSorteio = empresaConfig?.ativarSorteio === true;
 
-    const qtdSorteio =
-      Number(empresaConfig?.qtdSorteio || 5);
-
-    const ativarBrinde =
-      empresaConfig?.ativarBrinde !== false;
-
-    const ativarSorteio =
-      empresaConfig?.ativarSorteio === true;
-
-    // ==================================================
-    // 🔥 TOP 5 ÚLTIMOS
-    // ==================================================
-    const q = query(
+    const qTodos = query(
       collection(db, "clientesEmpresa"),
       where("empresa", "==", empresaLogada),
-      orderBy("ultimaValidacao", "desc"),
-      limit(5)
+      orderBy("ultimaValidacao", "desc")
     );
 
-    // ==================================================
-    // 🔥 META CLIENTES
-    // ==================================================
-    const qMeta = query(
-      collection(db, "clientesEmpresa"),
-      where("empresa", "==", empresaLogada),
-      where("usos", ">=", Math.min(metaBrinde, metaSorteio)),
-      orderBy("usos", "desc")
-    );
-
-    const snap = await getDocs(q);
-    const snapMeta = await getDocs(qMeta);
+    const snap = await getDocs(qTodos);
 
     if (snap.empty) {
       box.innerHTML = "Nenhuma validação encontrada";
@@ -620,112 +595,202 @@ async function carregarUltimasValidacoes() {
 
     box.innerHTML = "";
 
-    // ==================================================
-    // 🔥 FILTRA CLIENTES
-    // ==================================================
-    const clientesBrinde = [];
-    const clientesSorteio = [];
+    const aptosBrinde = [];
+    const aptosSorteio = [];
+    const normais = [];
 
-    snapMeta.forEach((docu) => {
-
-      const d = docu.data();
-
-      if (d.usos >= metaBrinde) {
-        clientesBrinde.push({
-          id: docu.id,
-          ...d
-        });
-      }
-
-      if (d.usos >= metaSorteio) {
-        clientesSorteio.push({
-          id: docu.id,
-          ...d
-        });
-      }
-
-    });
-
-    // ==================================================
-    // 🔥 TOPO - SORTEIO
-    // ==================================================
-    if (
-      ativarSorteio &&
-      clientesSorteio.length >= qtdSorteio
-    ) {
-
-      box.innerHTML += `
-        <div class="card-beneficio card-sorteio">
-
-          <strong>
-            🎉 Sorteio liberado
-          </strong>
-
-          <span>
-            Já existem ${clientesSorteio.length}
-            clientes com ${metaSorteio}
-            compras participando!
-          </span>
-
-        </div>
-      `;
-    }
-
-    // ==================================================
-    // 🔥 TOPO - BRINDES
-    // ==================================================
-    if (ativarBrinde) {
-
-      clientesBrinde.forEach((d) => {
-
-        if (!d.premiado) {
-
-          box.innerHTML += `
-            <div class="card-beneficio">
-
-              <strong>
-                🏆 ${d.nome || d.clienteId}
-              </strong>
-
-              <span>
-                Atingiu ${metaBrinde}
-                compras e pode ganhar prêmio.
-              </span>
-
-              <div style="
-                margin-top:12px;
-              ">
-
-                <button
-                  class="btn btn-primary"
-                  onclick="premiarCliente('${d.id}')">
-
-                  Premiar
-
-                </button>
-
-              </div>
-
-            </div>
-          `;
-        }
-
-      });
-
-    }
-
-    // ==================================================
-    // 🔥 LISTA NORMAL
-    // ==================================================
+    // 🔥 SEPARAÇÃO
     snap.forEach((docu) => {
 
       const d = docu.data();
 
-      const dataFormatada =
-        d.ultimaData || "--/--/----";
+      const usos = Number(d.usos || 0);
+      const entregues = Number(d.brindesEntregues || 0);
 
-      const horaFormatada =
-        d.ultimaHora || "--:--";
+      const ganhosBrinde = Math.floor(usos / metaBrinde);
+      const pendentesBrinde = ganhosBrinde - entregues;
+
+      const aptoSorteio =
+        usos >= metaSorteio &&
+        !d.participouSorteio;
+
+      const dados = {
+        idDoc: docu.id,
+        ...d,
+        pendentesBrinde
+      };
+
+      if (ativarSorteio && aptoSorteio) {
+        aptosSorteio.push(dados);
+      } 
+      else if (ativarBrinde && pendentesBrinde > 0) {
+        aptosBrinde.push(dados);
+      } 
+      else {
+        normais.push(dados);
+      }
+
+    });
+
+    // =====================================
+    // 🔥 SORTEIO (SÓ QUANDO BATER META)
+    // =====================================
+    if (
+  ativarSorteio &&
+  aptosSorteio.length >= qtdSorteio
+) {
+
+  box.innerHTML += `
+    <div class="card-beneficio" style="
+      background:#b88b00;
+      border:1px solid rgba(201,169,77,.15);
+      padding:18px;
+    ">
+
+     <strong style="
+  color:#000;
+  font-size:17px;
+  font-weight:700;
+  display:block;
+  margin-bottom:4px;
+">
+  Realizar sorteio
+</strong>
+
+      <span style="
+        color:#000;
+        font-size:13px;
+      ">
+        Clientes já atingiram os requisitos para participar
+      </span>
+
+    </div>
+  `;
+}
+    // =====================================
+    // 🔥 CLIENTES SORTEIO (TOPO)
+    // =====================================
+    aptosSorteio.forEach((d) => {
+
+      box.innerHTML += `
+        <div class="item-historico" style="
+          border:1px solid rgba(201,169,77,.15);
+          background:#101010;
+        ">
+
+          <div class="dados-historico">
+
+            <div style="
+              color:#ffd700;
+              font-size:12px;
+              margin-bottom:6px;
+              font-weight:bold;
+            ">
+             
+ Cliente apto para sorteio
+            </div>
+
+            <div class="topo-historico">
+
+              <strong style="color:#fff;font-size:16px;">
+                ${d.nome || d.clienteId}
+              </strong>
+
+              <button
+                class="btn-detalhes"
+                onclick="verDetalhes('${d.clienteId}')">
+                Ver detalhes
+              </button>
+
+            </div>
+
+            <span>ID: ${d.clienteId || "---"}</span>
+            <span>Total: ${moeda(d.totalGasto || 0)}</span>
+            <span>Usos: ${d.usos || 0}</span>
+            <span>${d.ultimaData || "--"} ${d.ultimaHora || "--"}</span>
+
+          </div>
+        </div>
+      `;
+
+    });
+
+    // =====================================
+    // 🔥 CLIENTES BRINDE
+    // =====================================
+    aptosBrinde.forEach((d) => {
+
+  box.innerHTML += `
+    <div class="item-historico" style="
+      border:1px solid rgba(255,215,0,.25);
+      background:linear-gradient(135deg,#171717,#0f0f0f);
+    ">
+
+      <div class="dados-historico">
+
+        <div style="
+          color:#ffd700;
+          font-size:13px;
+          margin-bottom:8px;
+          font-weight:bold;
+        ">
+          🏆 Cliente apto para premiação
+        </div>
+
+        <div class="topo-historico">
+
+          <strong style="color:#fff;font-size:17px;">
+            ${d.nome || d.clienteId}
+          </strong>
+
+          <button
+            class="btn-detalhes"
+            onclick="verDetalhes('${d.clienteId}')">
+            Ver detalhes
+          </button>
+
+        </div>
+
+        <span>ID: ${d.clienteId || "---"}</span>
+        <span>Total: ${moeda(d.totalGasto || 0)}</span>
+        <span>Usos: ${d.usos || 0}</span>
+        <span>${d.ultimaData || "--"} ${d.ultimaHora || "--"}</span>
+
+        ${d.pendentesBrinde > 0 ? `
+          <div style="
+            margin-top:-42px;
+            display:flex;
+            justify-content:flex-end;
+          ">
+
+            <button
+              onclick="premiarCliente('${d.idDoc}')"
+              style="
+                background:linear-gradient(135deg,#ffd700,#ffcc00);
+                color:#111;
+                border:none;
+                padding:9px 12px;
+                border-radius:10px;
+                font-size:12px;
+                font-weight:900;
+                cursor:pointer;
+                min-width:80px;
+                transition:0.2s ease;
+              ">
+              Premiar
+            </button>
+
+          </div>
+        ` : ``}
+
+      </div>
+    </div>
+  `;
+});
+    // =====================================
+    // 🔥 LISTA NORMAL
+    // =====================================
+    normais.slice(0, 5).forEach((d) => {
 
       box.innerHTML += `
         <div class="item-historico">
@@ -741,32 +806,17 @@ async function carregarUltimasValidacoes() {
               <button
                 class="btn-detalhes"
                 onclick="verDetalhes('${d.clienteId}')">
-
                 Ver detalhes
-
               </button>
 
             </div>
 
-            <span>
-              ID: ${d.clienteId || "---"}
-            </span>
-
-            <span>
-              Total: ${moeda(d.totalGasto || 0)}
-            </span>
-
-            <span>
-              Usos: ${Number(d.usos || 0)}
-            </span>
-
-            <span>
-              ${dataFormatada}
-              ${horaFormatada}
-            </span>
+            <span>ID: ${d.clienteId || "---"}</span>
+            <span>Total: ${moeda(d.totalGasto || 0)}</span>
+            <span>Usos: ${d.usos || 0}</span>
+            <span>${d.ultimaData || "--"} ${d.ultimaHora || "--"}</span>
 
           </div>
-
         </div>
       `;
 
@@ -774,97 +824,22 @@ async function carregarUltimasValidacoes() {
 
   } catch (erro) {
 
-  console.error("🔥 ERRO COMPLETO:", erro);
+    console.error(erro);
 
-  box.innerHTML = `
-    <div style="
-      background: linear-gradient(135deg, #2b0000, #120000);
-      border: 1px solid rgba(255, 0, 0, 0.3);
-      padding: 16px;
-      border-radius: 16px;
-      color: #ff4d4d;
-      font-family: Arial;
-      box-shadow: 0 10px 25px rgba(0,0,0,.4);
-    ">
-
+    box.innerHTML = `
       <div style="
-        font-size: 16px;
-        font-weight: bold;
-        margin-bottom: 8px;
-        color: #ff2e2e;
+        background:#2b0000;
+        color:#ff6b6b;
+        padding:16px;
+        border-radius:16px;
       ">
-        ⚠️ Falha ao carregar dados
+        ⚠ ${erro.message}
       </div>
-
-      <div style="
-        font-size: 13px;
-        opacity: .9;
-        margin-bottom: 10px;
-      ">
-        ${erro.message || "Erro desconhecido"}
-      </div>
-
-      <details style="cursor:pointer;">
-        <summary style="color:#ff7a7a; font-size:12px;">
-          Ver detalhes técnicos
-        </summary>
-
-        <pre style="
-          margin-top:10px;
-          font-size:11px;
-          background:#0a0a0a;
-          padding:10px;
-          border-radius:10px;
-          overflow:auto;
-          color:#ffb3b3;
-        ">
-${JSON.stringify(erro, null, 2)}
-        </pre>
-
-      </details>
-
-    </div>
-  `;
-
-}
-
-}
-
-
-
-// 🔥 PREMIAR CLIENTE
-window.premiarCliente = async (docId) => {
-
-  try {
-
-    await updateDoc(
-      doc(db, "clientesEmpresa", docId),
-      {
-        premiado: true,
-        dataPremio: Date.now()
-      }
-    );
-
-    mostrarMensagem(
-      "Cliente premiado"
-    );
-
-    await carregarUltimasValidacoes();
-
-  } catch (erro) {
-
-    console.error(
-      "Erro ao premiar:",
-      erro
-    );
-
-    mostrarMensagem(
-      "Erro ao premiar ❌"
-    );
-
+    `;
   }
 
-};
+}
+
 // 🔍 VER DETALHES
 window.verDetalhes = async (id) => {
 
@@ -1075,7 +1050,6 @@ function mostrarMensagem(texto) {
 
 }
 
-
 // ✅ VALIDAR
 window.validar = async () => {
 
@@ -1104,20 +1078,15 @@ window.validar = async () => {
 
   const desconto = descontoAtual();
 
-  // 🔥 impede desconto inválido
   if (desconto < 0 || desconto > 100) {
     mostrarMensagem("Desconto inválido ❗");
     return;
   }
 
-  const valorDesconto =
-    (valor * desconto) / 100;
+  const valorDesconto = (valor * desconto) / 100;
+  const total = Math.max(valor - valorDesconto, 0);
 
-  const total =
-    Math.max(valor - valorDesconto, 0);
-
-  const btn =
-    document.querySelector(".btn-success");
+  const btn = document.querySelector(".btn-success");
 
   if (btn.disabled) return;
 
@@ -1129,9 +1098,9 @@ window.validar = async () => {
 
   try {
 
-    // ==================================================
-    // 🔥 SALVA VALIDAÇÃO
-    // ==================================================
+    // ==========================================
+    // SALVA VALIDAÇÃO
+    // ==========================================
     await addDoc(
       collection(db, "validacoes"),
       {
@@ -1147,15 +1116,32 @@ window.validar = async () => {
       }
     );
 
-    // ==================================================
-    // 🔥 CLIENTE X EMPRESA
-    // ==================================================
     let usosAtual = 1;
 
+    // ==========================================
+    // CLIENTE EXISTE
+    // ==========================================
     if (dadosEmpresaCliente?.docId) {
 
       usosAtual =
         Number(dadosEmpresaCliente.usos || 0) + 1;
+
+      const atualizar = {
+        totalGasto: increment(total),
+        usos: increment(1),
+        ultimaValidacao: agoraMs,
+        ultimaData:
+          agora.toLocaleDateString("pt-BR"),
+        ultimaHora:
+          agora.toLocaleTimeString("pt-BR"),
+        nome: clienteAtual.nome || "",
+        foto: clienteAtual.foto || ""
+      };
+
+      // 🔥 PARTICIPA DO SORTEIO COM 3 COMPRAS
+      if (usosAtual >= 3) {
+        atualizar.aptoSorteio = true;
+      }
 
       await updateDoc(
         doc(
@@ -1163,17 +1149,7 @@ window.validar = async () => {
           "clientesEmpresa",
           dadosEmpresaCliente.docId
         ),
-        {
-          totalGasto: increment(total),
-          usos: increment(1),
-          ultimaValidacao: agoraMs,
-          ultimaData:
-            agora.toLocaleDateString("pt-BR"),
-          ultimaHora:
-            agora.toLocaleTimeString("pt-BR"),
-          nome: clienteAtual.nome || "",
-          foto: clienteAtual.foto || ""
-        }
+        atualizar
       );
 
     } else {
@@ -1190,6 +1166,9 @@ window.validar = async () => {
           totalGasto: total,
           usos: 1,
           brindesEntregues: 0,
+          premiado: false,
+          aptoSorteio: false,
+          sorteado: false,
           ultimaValidacao: agoraMs,
           ultimaData:
             agora.toLocaleDateString("pt-BR"),
@@ -1200,22 +1179,31 @@ window.validar = async () => {
 
     }
 
-    // ==================================================
-    // 🔥 ALERTA A CADA 10 COMPRAS
-    // ==================================================
+    // ==========================================
+    // ALERTA BRINDE
+    // ==========================================
     if (usosAtual % 10 === 0) {
 
       mostrarMensagem(
-        `🎁 ${clienteAtual.nome || "Cliente"} atingiu ${usosAtual} compras e ganhou brinde!`
+        `🎁 ${clienteAtual.nome || "Cliente"} atingiu ${usosAtual} compras!`
+      );
+
+    }
+
+    // 🔥 ALERTA SORTEIO
+    if (usosAtual === 3) {
+
+      mostrarMensagem(
+        `🎉 ${clienteAtual.nome || "Cliente"} entrou no sorteio!`
       );
 
     }
 
     await carregarUltimasValidacoes();
 
-    // ==================================================
-    // 🔥 FECHA CARD
-    // ==================================================
+    // ==========================================
+    // FECHA CARD
+    // ==========================================
     card.classList.remove("show");
     card.classList.add("hidden");
 
@@ -1240,9 +1228,6 @@ window.validar = async () => {
       botoesPrimarios[0].style.display = "none";
     }
 
-    // ==================================================
-    // 🔥 MOSTRA SUCESSO
-    // ==================================================
     setTimeout(() => {
 
       sucesso.classList.remove("hidden");
@@ -1259,7 +1244,6 @@ window.validar = async () => {
   } catch (erro) {
 
     console.error("Erro validar:", erro);
-
     mostrarMensagem("Erro ao validar ❌");
 
   } finally {
@@ -1396,94 +1380,34 @@ function limparCampos() {
     "Desconto aplicado: R$ 0,00 (0%)";
 
 }
+// 🔥 FUNÇÃO PREMIAR (COLOQUE AQUI NO FINAL DO SCRIPT)
+window.premiarCliente = async (idDoc) => {
 
-// ==================================================
-// ⚙️ CONFIG EMPRESA
-// ==================================================
-
-window.abrirConfigEmpresa = () => {
-
-  const modal =
-    document.getElementById("modalConfigEmpresa");
-
-  if (!modal) return;
-
-  modal.classList.remove("hidden");
-  modal.classList.add("show");
-
-  document.getElementById("cfgBrinde").value =
-    String(empresaConfig.ativarBrinde);
-
-  document.getElementById("cfgSorteio").value =
-    String(empresaConfig.ativarSorteio);
-
-  document.getElementById("cfgMetaBrinde").value =
-    empresaConfig.metaBrinde || 10;
-
-  document.getElementById("cfgMetaSorteio").value =
-    empresaConfig.metaSorteio || 10;
-
-  document.getElementById("cfgQtdSorteio").value =
-    empresaConfig.qtdSorteio || 5;
-
-};
-
-
-window.fecharConfigEmpresa = () => {
-
-  const modal =
-    document.getElementById("modalConfigEmpresa");
-
-  if (!modal) return;
-
-  modal.classList.remove("show");
-  modal.classList.add("hidden");
-
-};
-
-
-// ==================================================
-// 💾 SALVAR CONFIG
-// ==================================================
-
-window.salvarConfigEmpresa = async () => {
+  if (!idDoc) return;
 
   try {
 
-    empresaConfig = {
-      ativarBrinde:
-        document.getElementById("cfgBrinde").value === "true",
+    const ref = doc(db, "clientesEmpresa", idDoc);
 
-      ativarSorteio:
-        document.getElementById("cfgSorteio").value === "true",
+    await updateDoc(ref, {
+      brindesEntregues: increment(1)
+    });
 
-      metaBrinde:
-        Number(document.getElementById("cfgMetaBrinde").value || 10),
+    // 🔥 feedback leve (não trava UI)
+    mostrarMensagem("Premiação realizada ✅");
 
-      metaSorteio:
-        Number(document.getElementById("cfgMetaSorteio").value || 10),
+    // 🔥 NÃO recarrega tudo (remove o “bug visual”)
+    // await carregarUltimasValidacoes();
 
-      qtdSorteio:
-        Number(document.getElementById("cfgQtdSorteio").value || 5)
-    };
-
-    await setDoc(
-      doc(db, "empresas", empresaLogada),
-      empresaConfig,
-      { merge:true }
-    );
-
-    mostrarMensagem("Configurações salvas ✅");
-
-    fecharConfigEmpresa();
-
-    await carregarUltimasValidacoes();
+    // 🔥 só atualiza em background (sem travar interface)
+    setTimeout(() => {
+      carregarUltimasValidacoes();
+    }, 400);
 
   } catch (erro) {
 
-    console.error("Erro config:", erro);
-
-    mostrarMensagem("Erro ao salvar ❌");
+    console.error(erro);
+    mostrarMensagem("Erro ao premiar ❌");
 
   }
 

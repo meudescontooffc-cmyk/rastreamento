@@ -50,7 +50,7 @@
 <div class="linha"></div>
 
 <!-- ÚLTIMAS VALIDAÇÕES -->
-<<section id="ultimasValidacoes" class="ultimos-clientes">
+<section id="ultimasValidacoes" class="ultimos-clientes">
 
   <!-- TOPO -->
   <div class="titulo-historico topo-validacoes">
@@ -59,14 +59,6 @@
       <h3>Últimas validações</h3>
       <p>Clientes utilizados recentemente</p>
     </div>
-
-    <button
-      class="btn-config"
-      onclick="abrirConfigEmpresa()">
-
-      ©
-
-    </button>
 
   </div>
 
@@ -88,11 +80,8 @@
 
 </section>
 
-
 <!-- MODAL CONFIG EMPRESA -->
-<section
-  id="modalConfigEmpresa"
-  class="modal hidden">
+<section id="modalConfigEmpresa" class="modal hidden">
 
   <div class="modal-box">
 
@@ -100,9 +89,7 @@
 
       <h3>Configurações</h3>
 
-      <button
-        class="fechar-modal"
-        onclick="fecharConfigEmpresa()">
+      <button class="fechar-modal" onclick="fecharConfigEmpresa()">
         ✕
       </button>
 
@@ -113,9 +100,7 @@
       <!-- BRINDE -->
       <div class="campo-config">
 
-        <label>
-          Ativar brinde
-        </label>
+        <label>Ativar brinde</label>
 
         <select id="cfgBrinde">
           <option value="true">Sim</option>
@@ -127,23 +112,16 @@
       <!-- META BRINDE -->
       <div class="campo-config">
 
-        <label>
-          Compras para ganhar
-        </label>
+        <label>Compras para ganhar</label>
 
-        <input
-          type="number"
-          id="cfgMetaBrinde"
-          value="10">
+        <input type="number" id="cfgMetaBrinde" value="10">
 
       </div>
 
       <!-- SORTEIO -->
       <div class="campo-config">
 
-        <label>
-          Ativar sorteio
-        </label>
+        <label>Ativar sorteio</label>
 
         <select id="cfgSorteio">
           <option value="true">Sim</option>
@@ -155,38 +133,23 @@
       <!-- META SORTEIO -->
       <div class="campo-config">
 
-        <label>
-          Compras para sorteio
-        </label>
+        <label>Compras para sorteio</label>
 
-        <input
-          type="number"
-          id="cfgMetaSorteio"
-          value="10">
+        <input type="number" id="cfgMetaSorteio" value="10">
 
       </div>
 
       <!-- QUANTIDADE -->
       <div class="campo-config">
 
-        <label>
-          Clientes necessários
-        </label>
+        <label>Clientes necessários</label>
 
-        <input
-          type="number"
-          id="cfgQtdSorteio"
-          value="5">
+        <input type="number" id="cfgQtdSorteio" value="5">
 
       </div>
 
-      <!-- BOTÃO -->
-      <button
-        class="btn btn-primary"
-        onclick="salvarConfigEmpresa()">
-
+      <button class="btn btn-primary" onclick="salvarConfigEmpresa()">
         Salvar configurações
-
       </button>
 
     </div>
@@ -194,6 +157,7 @@
   </div>
 
 </section>
+
 <!-- MODAL DETALHES -->
 <section id="modalDetalhes" class="modal hidden">
 
@@ -203,9 +167,7 @@
 
       <h3>Histórico detalhado</h3>
 
-      <button
-        class="fechar-modal"
-        onclick="fecharDetalhes()">
+      <button class="fechar-modal" onclick="fecharDetalhes()">
         ✕
       </button>
 
@@ -228,9 +190,7 @@
   <div class="card hidden" id="card">
 
     <!-- VOLTAR CARD -->
-    <button
-      class="seta-voltar-card"
-      onclick="voltarCard()">
+    <button class="seta-voltar-card" onclick="voltarCard()">
       ←
     </button>
 
@@ -242,36 +202,26 @@
 
         <img
           id="foto"
-          src=""
+          src="https://via.placeholder.com/100"
           alt="Foto do cliente">
 
         <div class="info">
 
-          <h3 id="nome">
-            Nome do Cliente
-          </h3>
+          <h3 id="nome">Nome do Cliente</h3>
 
-          <p id="id">
-            ID: ---
-          </p>
+          <p id="id">ID: ---</p>
 
-          <p
-            id="status"
-            class="status ativo">
-            Ativo
-          </p>
+          <p id="status" class="status ativo">Ativo</p>
 
         </div>
 
       </div>
 
-      <!-- MÉTRICAS -->
+<!-- MÉTRICAS -->
       <div class="metrics">
 
         <div class="metric destaque">
-          <strong id="totalCompras">
-            R$ 0,00
-          </strong>
+          <strong id="totalCompras">R$ 0,00</strong>
           <span>Total em compras</span>
         </div>
 
@@ -287,16 +237,14 @@
     <!-- VALIDAR -->
     <div class="validar-box">
 
-      <h3> Validar benefício</h3>
+      <h3>🔒 Validar benefício</h3>
 
       <div class="validar-grid">
 
         <!-- VALOR -->
         <div class="campo-box">
 
-          <label for="valor">
-            Valor da venda
-          </label>
+          <label for="valor">Valor da venda</label>
 
           <input
             id="valor"
@@ -309,23 +257,17 @@
         <!-- DESCONTO -->
         <div class="campo-box">
 
-          <label for="tipoDesconto">
-            Desconto
-          </label>
+          <label for="tipoDesconto">Desconto</label>
 
           <div class="select-wrap">
 
             <select id="tipoDesconto">
-              <option value="">
-                Selecionar
-              </option>
+              <option value="">Selecionar</option>
               <option value="5">5%</option>
               <option value="10">10%</option>
               <option value="15">15%</option>
               <option value="20">20%</option>
-              <option value="manual">
-                Digitar
-              </option>
+              <option value="manual">Digitar</option>
             </select>
 
             <span class="seta">⌄</span>
@@ -336,7 +278,6 @@
             id="desconto"
             type="text"
             placeholder="00%"
-            class="hidden-input"
             style="display:none;">
 
         </div>
@@ -344,9 +285,7 @@
         <!-- TOTAL -->
         <div class="campo-box">
 
-          <label for="total">
-            Total final
-          </label>
+          <label for="total">Total final</label>
 
           <input
             id="total"
@@ -358,25 +297,16 @@
 
       </div>
 
-      <!-- INFO -->
-      <div
-        class="desconto-info"
-        id="infoDesconto">
-
-        Desconto aplicado:
-        R$ 0,00 (0%)
-
+      <!-- INFO DESCONTO -->
+      <div class="desconto-info" id="infoDesconto">
+        Desconto aplicado: R$ 0,00 (0%)
       </div>
 
-      <!-- BOTÃO -->
+      <!-- BOTÃO VALIDAR -->
       <div class="acoes-validar">
 
-        <button
-          class="btn btn-success"
-          onclick="validar()">
-
+        <button class="btn btn-success" onclick="validar()">
           Validar
-
         </button>
 
       </div>
@@ -401,9 +331,7 @@
         <tbody id="listaHistorico">
 
           <tr class="empty">
-            <td colspan="5">
-              Nenhum registro encontrado
-            </td>
+            <td colspan="5">Nenhum registro encontrado</td>
           </tr>
 
         </tbody>
@@ -417,28 +345,21 @@
 </section>
 
 <!-- SUCESSO -->
-<section
-  class="sucesso hidden"
-  id="sucesso">
+<section class="sucesso hidden" id="sucesso">
 
   <div class="sucesso-box">
 
-    <h1>
-      Benefício validado ✅
-    </h1>
+    <h1>Benefício validado ✅</h1>
 
-    <button
-      class="btn btn-primary"
-      onclick="voltar()">
-
+    <button class="btn btn-primary" onclick="voltar()">
       Voltar
-
     </button>
 
   </div>
 
 </section>
 
+<!-- SCRIPT -->
 <script type="module" src="script.js"></script>
 
 </body>
