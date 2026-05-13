@@ -450,7 +450,7 @@ function descontoAtual() {
   if (tipoDesconto.value === "manual") {
 
     return parseFloat(
-      descontoInput.value.replace("%", "")
+      descontoInput.value.replace("%", "").trim()
     ) || 0;
 
   }
@@ -460,6 +460,47 @@ function descontoAtual() {
 }
 
 
+// 🔥 INPUT MANUAL MELHORADO
+descontoInput.addEventListener("input", () => {
+
+  let valor = descontoInput.value.replace(/\D/g, "");
+
+  if (Number(valor) > 100) valor = "100";
+
+  // se apagar tudo
+  if (valor === "") {
+    descontoInput.value = "";
+    calcular();
+    return;
+  }
+
+  descontoInput.value = valor + "%";
+
+  // 🔥 cursor fica antes do %
+  setTimeout(() => {
+    descontoInput.setSelectionRange(
+      descontoInput.value.length - 1,
+      descontoInput.value.length - 1
+    );
+  }, 0);
+
+  calcular();
+
+});
+
+
+// 🔥 ao clicar no campo também posiciona antes do %
+descontoInput.addEventListener("click", () => {
+
+  if (descontoInput.value.includes("%")) {
+
+    const pos = descontoInput.value.length - 1;
+
+    descontoInput.setSelectionRange(pos, pos);
+
+  }
+
+});
 // 💰 CALCULAR
 function calcular() {
 
@@ -1185,7 +1226,7 @@ window.validar = async () => {
     if (usosAtual % 10 === 0) {
 
       mostrarMensagem(
-        `🎁 ${clienteAtual.nome || "Cliente"} atingiu ${usosAtual} compras!`
+        ` ${clienteAtual.nome || "Cliente"} atingiu ${usosAtual} compras!`
       );
 
     }
@@ -1194,7 +1235,7 @@ window.validar = async () => {
     if (usosAtual === 3) {
 
       mostrarMensagem(
-        `🎉 ${clienteAtual.nome || "Cliente"} entrou no sorteio!`
+        ` ${clienteAtual.nome || "Cliente"} entrou no sorteio!`
       );
 
     }
@@ -1380,7 +1421,7 @@ function limparCampos() {
     "Desconto aplicado: R$ 0,00 (0%)";
 
 }
-// 🔥 FUNÇÃO PREMIAR (COLOQUE AQUI NO FINAL DO SCRIPT)
+// 🔥 FUNÇÃO PREMIAR
 window.premiarCliente = async (idDoc) => {
 
   if (!idDoc) return;
@@ -1393,22 +1434,44 @@ window.premiarCliente = async (idDoc) => {
       brindesEntregues: increment(1)
     });
 
-    // 🔥 feedback leve (não trava UI)
-    mostrarMensagem("Premiação realizada ✅");
+    // 🔥 mensagem embaixo de "Últimas validações" e acima dos cards
+ const lista = document.getElementById("listaUltimos");
 
-    // 🔥 NÃO recarrega tudo (remove o “bug visual”)
-    // await carregarUltimasValidacoes();
+lista.innerHTML = `
+  <div style="
+    color:#fff;
+    padding:6px 2px 12px 2px;
+    font-size:14px;
+    font-weight:700;
+    text-align:center;
+  ">
+    Premiação realizada
+  </div>
+` + lista.innerHTML;
 
-    // 🔥 só atualiza em background (sem travar interface)
-    setTimeout(() => {
-      carregarUltimasValidacoes();
-    }, 400);
+// 🔥 atualiza lista depois
+setTimeout(() => {
+  carregarUltimasValidacoes();
+}, 1200);
 
-  } catch (erro) {
+} catch (erro) {
 
-    console.error(erro);
-    mostrarMensagem("Erro ao premiar ❌");
+  console.error(erro);
 
-  }
+  const lista = document.getElementById("listaUltimos");
+
+  lista.innerHTML = `
+    <div style="
+      color:#fff;
+      padding:6px 2px 12px 2px;
+      font-size:14px;
+      font-weight:700;
+      text-align:center;
+    ">
+      Erro ao premiar
+    </div>
+  ` + lista.innerHTML;
+
+}
 
 };
