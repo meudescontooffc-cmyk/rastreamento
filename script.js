@@ -44,6 +44,12 @@ let buscandoAgora = false;
 let tokenBusca = 0;
 
 
+// 🔥 CACHE INTELIGENTE ÚLTIMAS VALIDAÇÕES
+let cacheUltimasHTML = "";
+let cacheUltimasTempo = 0;
+const TEMPO_CACHE_ULTIMAS = 30000; // 30 segundos
+
+
 // 🔥 PROTEÇÃO REAL PELO FIREBASE AUTH
 let empresaConfig = {
   ativarBrinde: true,
@@ -52,8 +58,6 @@ let empresaConfig = {
   metaSorteio: 10,
   qtdSorteio: 5
 };
-
-
 // 🔥 BUSCAR CONFIG DA EMPRESA
 async function carregarConfigEmpresa() {
 
@@ -170,15 +174,14 @@ numeros.forEach((input, i) => {
 
 
 // 💰 FORMATA MOEDA
+const formatadorMoeda = new Intl.NumberFormat("pt-BR", {
+  style: "currency",
+  currency: "BRL"
+});
+
 function moeda(valor) {
-
-  return Number(valor || 0).toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL"
-  });
-
+  return formatadorMoeda.format(Number(valor || 0));
 }
-
 
 // 🔥 ANIMAR NÚMEROS
 function animarNumero(el, valorFinal, dinheiro = false) {
@@ -341,10 +344,10 @@ window.buscar = async () => {
     const status = document.getElementById("status");
 
     if (clienteAtual.status === "ativo") {
-      status.innerText = "● Ativo";
+      status.innerText = "Ativo";
       status.className = "status ativo";
     } else {
-      status.innerText = "● Inativo";
+      status.innerText = "Inativo";
       status.className = "status inativo";
     }
 // 🔥 TOTAL COM DESCONTO (valor realmente pago)
@@ -610,7 +613,18 @@ async function carregarUltimasValidacoes() {
 
   if (!box || !empresaLogada) return;
 
-  box.innerHTML = "Carregando...";
+  const agora = Date.now();
+
+  const cacheValido =
+    cacheUltimasHTML &&
+    (agora - cacheUltimasTempo < TEMPO_CACHE_ULTIMAS);
+
+  // 🔥 mostra cache instantâneo
+  if (cacheValido) {
+    box.innerHTML = cacheUltimasHTML;
+  } else {
+    box.innerHTML = "Carregando...";
+  }
 
   try {
 
@@ -624,7 +638,8 @@ async function carregarUltimasValidacoes() {
     const qTodos = query(
       collection(db, "clientesEmpresa"),
       where("empresa", "==", empresaLogada),
-      orderBy("ultimaValidacao", "desc")
+      orderBy("ultimaValidacao", "desc"),
+      limit(30)
     );
 
     const snap = await getDocs(qTodos);
@@ -633,8 +648,6 @@ async function carregarUltimasValidacoes() {
       box.innerHTML = "Nenhuma validação encontrada";
       return;
     }
-
-    box.innerHTML = "";
 
     const aptosBrinde = [];
     const aptosSorteio = [];
@@ -663,57 +676,57 @@ async function carregarUltimasValidacoes() {
 
       if (ativarSorteio && aptoSorteio) {
         aptosSorteio.push(dados);
-      } 
-      else if (ativarBrinde && pendentesBrinde > 0) {
+      } else if (ativarBrinde && pendentesBrinde > 0) {
         aptosBrinde.push(dados);
-      } 
-      else {
+      } else {
         normais.push(dados);
       }
 
     });
 
+    // 🔥 MONTA HTML UMA ÚNICA VEZ
+    let html = "";
+
     // =====================================
-    // 🔥 SORTEIO (SÓ QUANDO BATER META)
+    // 🔥 CARD SORTEIO
     // =====================================
     if (
-  ativarSorteio &&
-  aptosSorteio.length >= qtdSorteio
-) {
+      ativarSorteio &&
+      aptosSorteio.length >= qtdSorteio
+    ) {
 
-  box.innerHTML += `
-    <div class="card-beneficio" style="
-      background:#b88b00;
-      border:1px solid rgba(201,169,77,.15);
-      padding:18px;
-    ">
+      html += `
+        <div class="card-beneficio" style="
+          background:#b88b00;
+          border:1px solid rgba(201,169,77,.15);
+          padding:18px;
+        ">
+          <strong style="
+            color:#000;
+            font-size:17px;
+            font-weight:700;
+            display:block;
+            margin-bottom:4px;
+          ">
+            Realizar sorteio
+          </strong>
 
-     <strong style="
-  color:#000;
-  font-size:17px;
-  font-weight:700;
-  display:block;
-  margin-bottom:4px;
-">
-  Realizar sorteio
-</strong>
+          <span style="
+            color:#000;
+            font-size:13px;
+          ">
+            Clientes já atingiram os requisitos para participar
+          </span>
+        </div>
+      `;
+    }
 
-      <span style="
-        color:#000;
-        font-size:13px;
-      ">
-        Clientes já atingiram os requisitos para participar
-      </span>
-
-    </div>
-  `;
-}
     // =====================================
-    // 🔥 CLIENTES SORTEIO (TOPO)
+    // 🔥 CLIENTES SORTEIO
     // =====================================
     aptosSorteio.forEach((d) => {
 
-      box.innerHTML += `
+      html += `
         <div class="item-historico" style="
           border:1px solid rgba(201,169,77,.15);
           background:#101010;
@@ -727,8 +740,7 @@ async function carregarUltimasValidacoes() {
               margin-bottom:6px;
               font-weight:bold;
             ">
-             
- Cliente apto para sorteio
+              Cliente apto para sorteio
             </div>
 
             <div class="topo-historico">
@@ -753,7 +765,6 @@ async function carregarUltimasValidacoes() {
           </div>
         </div>
       `;
-
     });
 
     // =====================================
@@ -761,79 +772,80 @@ async function carregarUltimasValidacoes() {
     // =====================================
     aptosBrinde.forEach((d) => {
 
-  box.innerHTML += `
-    <div class="item-historico" style="
-      border:1px solid rgba(255,215,0,.25);
-      background:linear-gradient(135deg,#171717,#0f0f0f);
-    ">
-
-      <div class="dados-historico">
-
-        <div style="
-          color:#ffd700;
-          font-size:13px;
-          margin-bottom:8px;
-          font-weight:bold;
+      html += `
+        <div class="item-historico" style="
+          border:1px solid rgba(255,215,0,.25);
+          background:linear-gradient(135deg,#171717,#0f0f0f);
         ">
-          🏆 Cliente apto para premiação
-        </div>
 
-        <div class="topo-historico">
+          <div class="dados-historico">
 
-          <strong style="color:#fff;font-size:17px;">
-            ${d.nome || d.clienteId}
-          </strong>
+            <div style="
+              color:#ffd700;
+              font-size:13px;
+              margin-bottom:8px;
+              font-weight:bold;
+            ">
+              Cliente apto para premiação
+            </div>
 
-          <button
-            class="btn-detalhes"
-            onclick="verDetalhes('${d.clienteId}')">
-            Ver detalhes
-          </button>
+            <div class="topo-historico">
 
-        </div>
+              <strong style="color:#fff;font-size:17px;">
+                ${d.nome || d.clienteId}
+              </strong>
 
-        <span>ID: ${d.clienteId || "---"}</span>
-        <span>Total: ${moeda(d.totalGasto || 0)}</span>
-        <span>Usos: ${d.usos || 0}</span>
-        <span>${d.ultimaData || "--"} ${d.ultimaHora || "--"}</span>
+              <button
+                class="btn-detalhes"
+                onclick="verDetalhes('${d.clienteId}')">
+                Ver detalhes
+              </button>
 
-        ${d.pendentesBrinde > 0 ? `
-          <div style="
-            margin-top:-42px;
-            display:flex;
-            justify-content:flex-end;
-          ">
+            </div>
 
-            <button
-              onclick="premiarCliente('${d.idDoc}')"
-              style="
-                background:linear-gradient(135deg,#ffd700,#ffcc00);
-                color:#111;
-                border:none;
-                padding:9px 12px;
-                border-radius:10px;
-                font-size:12px;
-                font-weight:900;
-                cursor:pointer;
-                min-width:80px;
-                transition:0.2s ease;
+            <span>ID: ${d.clienteId || "---"}</span>
+            <span>Total: ${moeda(d.totalGasto || 0)}</span>
+            <span>Usos: ${d.usos || 0}</span>
+            <span>${d.ultimaData || "--"} ${d.ultimaHora || "--"}</span>
+
+            ${d.pendentesBrinde > 0 ? `
+              <div style="
+                margin-top:-42px;
+                display:flex;
+                justify-content:flex-end;
               ">
-              Premiar
-            </button>
+
+                <button
+                  onclick="premiarCliente('${d.idDoc}')"
+                  style="
+                    background:linear-gradient(135deg,#ffd700,#ffcc00);
+                    color:#111;
+                    border:none;
+                    padding:9px 12px;
+                    border-radius:10px;
+                    font-size:12px;
+                    font-weight:900;
+                    cursor:pointer;
+                    min-width:80px;
+                    transition:0.2s ease;
+                  ">
+                  Premiar
+                </button>
+
+              </div>
+            ` : ""}
 
           </div>
-        ` : ``}
+        </div>
+      `;
+    });
 
-      </div>
-    </div>
-  `;
-});
     // =====================================
     // 🔥 LISTA NORMAL
     // =====================================
     normais.slice(0, 5).forEach((d) => {
 
-      box.innerHTML += `
+      html += `
         <div class="item-historico">
 
           <div class="dados-historico">
@@ -860,8 +872,16 @@ async function carregarUltimasValidacoes() {
           </div>
         </div>
       `;
-
     });
+
+// 🔥 RENDERIZA UMA VEZ SÓ
+    if (html !== cacheUltimasHTML) {
+      box.innerHTML = html;
+    }
+
+    // 🔥 SALVA CACHE NOVO
+    cacheUltimasHTML = html;
+    cacheUltimasTempo = Date.now();
 
   } catch (erro) {
 
@@ -878,7 +898,6 @@ async function carregarUltimasValidacoes() {
       </div>
     `;
   }
-
 }
 
 // 🔍 VER DETALHES
@@ -1100,9 +1119,18 @@ window.validar = async () => {
   }
 
   if (!tipoDesconto.value) {
-    mostrarMensagem("Selecione o desconto primeiro ❗");
-    return;
-  }
+  mostrarMensagem("Selecione o desconto primeiro ❗");
+  return;
+}
+
+if (
+  tipoDesconto.value === "manual" &&
+  !descontoInput.value.trim()
+) {
+  mostrarMensagem("Digite o desconto manual ❗");
+  descontoInput.focus();
+  return;
+}
 
   let valor = valorInput.value
     .replace("R$", "")
@@ -1239,6 +1267,9 @@ window.validar = async () => {
       );
 
     }
+    
+cacheUltimasHTML = "";
+cacheUltimasTempo = 0;
 
     await carregarUltimasValidacoes();
 
@@ -1426,6 +1457,15 @@ window.premiarCliente = async (idDoc) => {
 
   if (!idDoc) return;
 
+  const btn = event?.target;
+
+  if (btn && btn.disabled) return;
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerText = "Premiando...";
+  }
+
   try {
 
     const ref = doc(db, "clientesEmpresa", idDoc);
@@ -1434,44 +1474,52 @@ window.premiarCliente = async (idDoc) => {
       brindesEntregues: increment(1)
     });
 
-    // 🔥 mensagem embaixo de "Últimas validações" e acima dos cards
- const lista = document.getElementById("listaUltimos");
+    const lista = document.getElementById("listaUltimos");
 
-lista.innerHTML = `
-  <div style="
-    color:#fff;
-    padding:6px 2px 12px 2px;
-    font-size:14px;
-    font-weight:700;
-    text-align:center;
-  ">
-    Premiação realizada
-  </div>
-` + lista.innerHTML;
+    lista.innerHTML = `
+      <div style="
+        color:#fff;
+        padding:6px 2px 12px 2px;
+        font-size:14px;
+        font-weight:700;
+        text-align:center;
+      ">
+        Premiação realizada
+      </div>
+    ` + lista.innerHTML;
 
-// 🔥 atualiza lista depois
-setTimeout(() => {
-  carregarUltimasValidacoes();
-}, 1200);
+    // 🔥 limpa cache (IMPORTANTE)
+    cacheUltimasHTML = "";
+    cacheUltimasTempo = 0;
 
-} catch (erro) {
+    // 🔥 atualiza lista depois
+    setTimeout(() => {
+      carregarUltimasValidacoes();
+    }, 1200);
 
-  console.error(erro);
+  } catch (erro) {
 
-  const lista = document.getElementById("listaUltimos");
+    console.error(erro);
 
-  lista.innerHTML = `
-    <div style="
-      color:#fff;
-      padding:6px 2px 12px 2px;
-      font-size:14px;
-      font-weight:700;
-      text-align:center;
-    ">
-      Erro ao premiar
-    </div>
-  ` + lista.innerHTML;
+    if (btn) {
+      btn.disabled = false;
+      btn.innerText = "Premiar";
+    }
 
-}
+    const lista = document.getElementById("listaUltimos");
+
+    lista.innerHTML = `
+      <div style="
+        color:#fff;
+        padding:6px 2px 12px 2px;
+        font-size:14px;
+        font-weight:700;
+        text-align:center;
+      ">
+        Erro ao premiar
+      </div>
+    ` + lista.innerHTML;
+
+  }
 
 };
