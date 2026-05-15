@@ -293,15 +293,10 @@ window.buscar = async () => {
 
   try {
 
-    const q = query(
-      collection(db, "clientes"),
-      where("id", "==", codigo),
-      limit(1)
-    );
+    // 🔥 BUSCA ULTRA RÁPIDA (SEM QUERY)
+    const snap = await getDoc(doc(db, "clientes", codigo));
 
-    const snap = await getDocs(q);
-
-    if (snap.empty) {
+    if (!snap.exists()) {
 
       msg.innerText = "Usuário não encontrado ❌";
 
@@ -311,16 +306,18 @@ window.buscar = async () => {
       return;
     }
 
-    document.getElementById("foto").src = "";
+    document.getElementById("foto").src =
+  "https://via.placeholder.com/100";
 
-    clienteAtual = snap.docs[0].data();
+    clienteAtual = snap.data();
 
     if (buscaAtual !== tokenBusca) {
       buscandoAgora = false;
       return;
     }
 
-    await buscarDadosEmpresaCliente(clienteAtual.id);
+    // 🔥 BUSCA DADOS EMPRESA CLIENTE
+   await buscarDadosEmpresaCliente(clienteAtual.id);
 
     document.getElementById("nome").innerText =
       clienteAtual.nome || "Sem nome";
@@ -333,24 +330,50 @@ window.buscar = async () => {
     fotoEl.src = "https://via.placeholder.com/100";
 
     setTimeout(() => {
-
       if (buscaAtual !== tokenBusca) return;
 
       fotoEl.src =
         clienteAtual.foto || "https://via.placeholder.com/100";
-
     }, 80);
 
     const status = document.getElementById("status");
 
-    if (clienteAtual.status === "ativo") {
-      status.innerText = "Ativo";
-      status.className = "status ativo";
-    } else {
-      status.innerText = "Inativo";
-      status.className = "status inativo";
-    }
-// 🔥 TOTAL COM DESCONTO (valor realmente pago)
+// 🔴 BLOQUEIO TOTAL PARA INATIVO (MOSTRA SÓ TOPO)
+if (clienteAtual.status !== "ativo") {
+
+  status.innerText = "Inativo";
+  status.className = "status inativo";
+
+  msg.innerText = "";
+
+  card.classList.remove("hidden");
+  card.classList.add("show");
+
+  // 🔥 TOPO SEMPRE VISÍVEL
+  document.querySelector(".perfil-box")?.style.setProperty("display", "flex");
+
+  document.querySelector(".info")?.style.setProperty("display", "block");
+
+  document.querySelector("#nome")?.style.setProperty("display", "block");
+  document.querySelector("#id")?.style.setProperty("display", "block");
+  document.querySelector("#status")?.style.setProperty("display", "block");
+
+  // 🔥 ESCONDE MÉTRICAS
+  document.querySelector(".metrics")?.style.setProperty("display", "none");
+
+  // 🔥 ESCONDE VALIDAÇÃO INTEIRA
+  document.querySelector(".validar-box")?.style.setProperty("display", "none");
+
+  // 🔥 ESCONDE HISTÓRICO INTEIRO
+  document.querySelector(".historico-box")?.style.setProperty("display", "none");
+
+  buscandoAgora = false;
+  return;
+}
+    // 🔵 ATIVO
+    status.innerText = "Ativo";
+    status.className = "status ativo";
+
     animarNumero(
       document.getElementById("totalCompras"),
       Number(dadosEmpresaCliente?.totalGasto || 0),
@@ -373,9 +396,8 @@ window.buscar = async () => {
 
     limparCampos();
 
-    await carregarHistorico();
+    carregarHistorico();
 
-    // 🔥 sobe tela
     window.scrollTo({
       top: 0,
       behavior: "smooth"
@@ -392,11 +414,8 @@ window.buscar = async () => {
   } finally {
 
     buscandoAgora = false;
-
   }
-
 };
-
 
 // 💰 CAMPO VALOR
 valorInput.addEventListener("input", () => {
@@ -816,7 +835,7 @@ async function carregarUltimasValidacoes() {
               ">
 
                 <button
-                  onclick="premiarCliente('${d.idDoc}')"
+                  onclick="premiarCliente(event,'${d.idDoc}')"
                   style="
                     background:linear-gradient(135deg,#ffd700,#ffcc00);
                     color:#111;
@@ -1260,13 +1279,14 @@ if (
     }
 
     // 🔥 ALERTA SORTEIO
-    if (usosAtual === 3) {
+    const metaSorteio = Number(empresaConfig?.metaSorteio || 10);
+if (usosAtual === metaSorteio) {
 
-      mostrarMensagem(
-        ` ${clienteAtual.nome || "Cliente"} entrou no sorteio!`
-      );
+  mostrarMensagem(
+    `${clienteAtual.nome || "Cliente"} atingiu ${metaSorteio} compras e entrou no sorteio!`
+  );
 
-    }
+}
     
 cacheUltimasHTML = "";
 cacheUltimasTempo = 0;
@@ -1377,7 +1397,8 @@ window.voltar = async () => {
   document.getElementById("status").className =
     "status ativo";
 
-  document.getElementById("foto").src = "";
+  document.getElementById("foto").src =
+  "https://via.placeholder.com/100";
 
   limparCampos();
 
@@ -1453,7 +1474,7 @@ function limparCampos() {
 
 }
 // 🔥 FUNÇÃO PREMIAR
-window.premiarCliente = async (idDoc) => {
+window.premiarCliente = async (event, idDoc) => {
 
   if (!idDoc) return;
 
