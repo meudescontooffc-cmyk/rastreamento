@@ -1,61 +1,85 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ADM</title>
-
-<link rel="stylesheet" href="admin.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ADM</title>
+  <link rel="stylesheet" href="admin.css">
 </head>
-
 <body>
 
-<h2>Painel ADM</h2>
+  <h2 id="tituloPagina">Painel ADM</h2>
 
-<!-- BUSCA -->
-<div class="codigo">
-
-  <div class="estado-box">
-    <input id="estado" maxlength="2" placeholder="UF" autocomplete="off">
-    <select id="listaEstados">
-      <option value="">UF</option>
-      <option>MA</option>
-      <option>SP</option>
-      <option>RJ</option>
-      <option>CE</option>
-    </select>
+  <!-- =====================================
+       🔍 BUSCA
+  ===================================== -->
+  <div class="codigo">
+    <div class="estado-box">
+      <input id="estado" maxlength="2" placeholder="UF" autocomplete="off">
+      <select id="listaEstados">
+        <option value="">UF</option>
+        <option>MA</option>
+        <option>SP</option>
+        <option>RJ</option>
+        <option>CE</option>
+      </select>
+    </div>
+    <span class="traco">-</span>
+    <input id="c1" maxlength="1" inputmode="numeric">
+    <input id="c2" maxlength="1" inputmode="numeric">
+    <input id="c3" maxlength="1" inputmode="numeric">
+    <input id="c4" maxlength="1" inputmode="numeric">
+    <input id="c5" maxlength="1" inputmode="numeric">
+    <input id="c6" maxlength="1" inputmode="numeric">
   </div>
 
-  <span class="traco">-</span>
+  <button class="btn" onclick="buscar()">Procurar usuário</button>
 
-  <input id="c1" maxlength="1" inputmode="numeric">
-  <input id="c2" maxlength="1" inputmode="numeric">
-  <input id="c3" maxlength="1" inputmode="numeric">
-  <input id="c4" maxlength="1" inputmode="numeric">
-  <input id="c5" maxlength="1" inputmode="numeric">
-  <input id="c6" maxlength="1" inputmode="numeric">
+  <div class="linha"></div>
 
-</div>
+  <!-- =====================================
+       🔥 MENU
+  ===================================== -->
+  <div class="menu-scroll">
 
-<button class="btn" onclick="buscar()">Procurar usuário</button>
+    <button class="btn-menu" onclick="verAtivos()">Ativos</button>
+    <button class="btn-menu" onclick="verInativos()">Inativos</button>
+    <button class="btn-menu" onclick="verValidacoes()">Validações</button>
+    <button class="btn-menu btn-menu-empresas" onclick="verEmpresas()">🍆Empresas🥛</button>
+    <button class="btn-menu btn-menu-premiacoes" onclick="verPremiacoes()"> Premiações</button>
+    <button class="btn-menu btn-menu-sorteios" onclick="verSorteios()"> Sorteios</button>
+    <button class="btn-menu" onclick="gerarCodigo()">Gerar Código</button>
+    <button class="btn-menu" onclick="listarClientes()">Todos</button>
 
-<div class="linha"></div>
+  </div>
 
-<!-- MENU DESLIZANTE (AGORA É FILTRO) -->
-<div class="menu-scroll">
+  <!-- =====================================
+       🔥 TOPO NAVEGAÇÃO
+  ===================================== -->
+  <div id="topoNavegacao" class="topo-navegacao hidden">
+    <button class="btn-voltar" onclick="history.back()">← Voltar</button>
+    <div id="tituloSecao">Empresas</div>
+  </div>
 
-  <button class="btn-menu" onclick="verAtivos()">Ativos</button>
-  <button class="btn-menu" onclick="verInativos()">Inativos</button>
-  <button class="btn-menu" onclick="verValidacoes()">Validações</button>
-  <button class="btn-menu" onclick="gerarCodigo()">Gerar Código</button>
-  <button class="btn-menu" onclick="listarClientes()">Todos</button>
+  <!-- =====================================
+       🔥 LISTA PRINCIPAL
+  ===================================== -->
+  <div id="lista"></div>
 
-</div>
+  <!-- =====================================
+       🔥 MODAL DETALHES
+  ===================================== -->
+  <div id="modalDetalhes" class="modal hidden">
+    <div class="modal-box">
+      <div class="modal-topo">
+        <h3>Histórico do Cliente</h3>
+        <button class="fechar-modal" onclick="fecharModal()">✕</button>
+      </div>
+      <div id="conteudoModal"></div>
+    </div>
+  </div>
 
-<!-- LISTA -->
-<div id="lista"></div>
-
-<script type="module" src="admin.js"></script>
+  <script type="module" src="admin.js"></script>
 
 </body>
 </html>

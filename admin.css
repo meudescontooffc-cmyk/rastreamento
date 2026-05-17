@@ -1,236 +1,884 @@
-body{
-  background:#0f0f0f;
-  color:white;
-  font-family:Arial;
-  text-align:center;
-  padding:20px;
-  overflow-x:hidden;
+/* =====================================
+   🔥 BASE
+===================================== */
+* { box-sizing: border-box; }
+
+body {
+  background: #0a0a0a;
+  color: white;
+  font-family: Arial, sans-serif;
+  text-align: center;
+  padding: 20px;
+  overflow-x: hidden;
 }
 
-/* TITULO */
-h2{
-  color:gold;
-  margin-bottom:15px;
-  text-shadow:0 0 10px rgba(255,215,0,0.5);
+/* =====================================
+   🔥 TITULO
+===================================== */
+h2 {
+  color: gold;
+  margin-bottom: 15px;
+  font-size: 1.5rem;
+  letter-spacing: 0.05em;
+  text-shadow: 0 0 20px rgba(255,215,0,0.4);
 }
 
-/* ===== INPUT ===== */
-.codigo{
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  gap:10px;
-  margin:25px 0;
-  flex-wrap:wrap;
+/* =====================================
+   🔥 INPUT BUSCA
+===================================== */
+.codigo {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin: 25px 0;
+  flex-wrap: wrap;
 }
 
-.codigo input{
-  width:42px;
-  height:52px;
-  text-align:center;
-  font-size:20px;
-  border-radius:10px;
-  border:1px solid rgba(255,215,0,0.4);
-  background:#1c1c1c;
-  color:white;
-  transition:0.3s;
+.codigo input {
+  width: 42px;
+  height: 52px;
+  text-align: center;
+  font-size: 20px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,215,0,0.3);
+  background: #141414;
+  color: white;
+  transition: 0.3s;
 }
 
-.codigo input:focus{
-  border-color:gold;
-  box-shadow:0 0 12px gold;
-  transform:scale(1.1);
-  outline:none;
+.codigo input:focus {
+  border-color: gold;
+  box-shadow: 0 0 14px rgba(255,215,0,0.4);
+  transform: scale(1.08);
+  outline: none;
 }
 
-/* ESTADO */
-.estado-box{
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  gap:5px;
+/* =====================================
+   🔥 ESTADO
+===================================== */
+.estado-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
 }
 
-.estado-box input{
-  width:42px;
-  height:52px;
-  text-transform:uppercase;
+.estado-box input {
+  width: 42px;
+  height: 52px;
+  text-transform: uppercase;
 }
 
-.estado-box select{
-  width:42px;
-  padding:4px;
-  border-radius:6px;
-  border:1px solid gold;
-  background:#1c1c1c;
-  color:gold;
-  font-size:11px;
+.estado-box select {
+  width: 42px;
+  padding: 4px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,215,0,0.5);
+  background: #141414;
+  color: gold;
+  font-size: 11px;
 }
 
-/* TRAÇO */
-.traco{
-  font-size:30px;
-  color:gold;
-  text-shadow:0 0 10px gold;
+/* =====================================
+   🔥 TRAÇO
+===================================== */
+.traco {
+  font-size: 28px;
+  color: gold;
+  opacity: 0.6;
 }
 
-/* BOTÃO PRINCIPAL */
-.btn{
-  padding:12px 25px;
-  border:none;
-  border-radius:10px;
-  background:linear-gradient(45deg,#c9a100,#ffd700);
-  font-weight:bold;
-  cursor:pointer;
-  transition:0.3s;
+/* =====================================
+   🔥 BOTÃO PRINCIPAL
+===================================== */
+.btn {
+  padding: 12px 28px;
+  border: none;
+  border-radius: 50px;
+  background: linear-gradient(135deg, #b8860b, #ffd700);
+  color: #111;
+  font-weight: bold;
+  font-size: 14px;
+  cursor: pointer;
+  transition: 0.3s;
+  box-shadow: 0 4px 16px rgba(255,215,0,0.2);
 }
 
-.btn:hover{
-  transform:scale(1.05);
-  box-shadow:0 0 15px gold;
+.btn:hover {
+  transform: scale(1.04);
+  box-shadow: 0 6px 22px rgba(255,215,0,0.35);
 }
 
-/* LINHA */
-.linha{
-  width:100vw;
-  height:1px;
-  background:linear-gradient(to right, transparent, gold, transparent);
-  margin:30px 0;
-  margin-left:calc(-50vw + 50%);
+/* =====================================
+   🔥 LINHA DIVISÓRIA
+===================================== */
+.linha {
+  width: 100vw;
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(255,215,0,0.4), transparent);
+  margin: 28px 0;
+  margin-left: calc(-50vw + 50%);
 }
 
-/* ===== MENU DESLIZANTE ===== */
-.menu-scroll{
-  display:flex;
-  gap:10px;
-  overflow-x:auto;
-  padding:10px 5px;
-  margin-bottom:20px;
+/* =====================================
+   🔥 MENU SCROLL
+===================================== */
+.menu-scroll {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 8px 2px 12px;
+  margin-bottom: 16px;
+  scrollbar-width: none;
 }
 
-.menu-scroll::-webkit-scrollbar{
-  display:none;
+.menu-scroll::-webkit-scrollbar { display: none; }
+
+/* =====================================
+   🔥 BOTÕES MENU — todos no tema ouro
+===================================== */
+.btn-menu {
+  min-width: 130px;
+  padding: 10px 16px;
+  border-radius: 50px;
+  background: #141414;
+  color: rgba(255,215,0,0.85);
+  border: 1px solid rgba(255,215,0,0.2);
+  cursor: pointer;
+  transition: 0.25s;
+  font-weight: bold;
+  font-size: 13px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
-/* BOTÕES MENU */
-.btn-menu{
-  min-width:140px;
-  padding:10px;
-  border:none;
-  border-radius:10px;
-  background:#1c1c1c;
-  color:gold;
-  border:1px solid rgba(255,215,0,0.3);
-  cursor:pointer;
-  transition:0.3s;
-  font-weight:bold;
+.btn-menu:hover {
+  background: linear-gradient(135deg, #b8860b, #ffd700);
+  color: #111;
+  border-color: transparent;
+  box-shadow: 0 4px 16px rgba(255,215,0,0.25);
+  transform: translateY(-1px);
 }
 
-.btn-menu:hover{
-  background:gold;
-  color:black;
-  box-shadow:0 0 10px gold;
-  transform:scale(1.05);
+/* Empresas */
+.btn-menu-empresas {
+  border-color: rgba(255,215,0,0.35);
 }
 
-/* ===== LISTA ===== */
-#lista{
-  display:flex;
-  flex-direction:column;
-  gap:15px;
-  margin-top:10px;
+/* Premiações — ouro mais quente */
+.btn-menu-premiacoes {
+  border-color: rgba(255,200,0,0.4);
+  color: #ffd700;
 }
 
-/* CARD CLIENTE */
-.card{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  background:#111;
-  border:1px solid rgba(255,215,0,0.4);
-  border-radius:15px;
-  padding:12px;
-  box-shadow:0 0 15px rgba(255,215,0,0.1);
-  animation:fadeIn 0.4s ease;
+/* Sorteios — ouro também, sem verde */
+.btn-menu-sorteios {
+  border-color: rgba(255,215,0,0.4);
+  color: #ffd700;
 }
 
-/* FOTO */
-.card img{
-  width:60px;
-  height:75px;
-  border-radius:8px;
-  object-fit:cover;
-  border:2px solid gold;
+/* =====================================
+   🔥 TOPO NAVEGAÇÃO
+===================================== */
+.topo-navegacao {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 10px 0 20px 0;
+  background: #111;
+  border: 1px solid rgba(255,215,0,0.15);
+  padding: 12px 16px;
+  border-radius: 14px;
+  animation: fadeIn .25s ease;
 }
 
-/* INFO */
-.info{
-  flex:1;
-  text-align:left;
-  margin-left:10px;
+#tituloSecao {
+  color: gold;
+  font-size: 14px;
+  font-weight: bold;
+  letter-spacing: 0.04em;
 }
 
-.info h3{
-  margin:0;
-  font-size:16px;
+/* =====================================
+   🔥 BOTÃO VOLTAR
+===================================== */
+.btn-voltar {
+  border: 1px solid rgba(255,215,0,0.3);
+  background: transparent;
+  color: gold;
+  padding: 8px 16px;
+  border-radius: 50px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 13px;
+  transition: .3s;
 }
 
-.info p{
-  margin:3px 0;
-  font-size:13px;
+.btn-voltar:hover {
+  background: gold;
+  color: #000;
+  border-color: transparent;
 }
 
-/* STATUS */
-.status{
-  font-weight:bold;
+/* Voltar inline dentro da lista */
+.btn-voltar-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(255,215,0,0.25);
+  background: transparent;
+  color: rgba(255,215,0,0.8);
+  padding: 8px 18px;
+  border-radius: 50px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 13px;
+  transition: .3s;
+  margin-bottom: 14px;
 }
 
-.ativo{
-  color:#00ff88;
+.btn-voltar-inline:hover {
+  background: rgba(255,215,0,0.1);
+  color: gold;
+  border-color: rgba(255,215,0,0.5);
 }
 
-.inativo{
-  color:#ff4d4d;
+/* =====================================
+   🔥 LISTA PRINCIPAL
+===================================== */
+#lista {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
 }
 
-/* ===== BOTÃO DO LADO DO CLIENTE ===== */
-.acao{
-  margin-left:10px;
+/* =====================================
+   🔥 CARD BASE
+===================================== */
+.card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #111;
+  border: 1px solid rgba(255,215,0,0.1);
+  border-radius: 16px;
+  padding: 14px 16px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+  animation: fadeIn .3s ease;
+  transition: border-color .2s, box-shadow .2s;
 }
 
-.btn-acao{
-  padding:8px 16px;
-  border:none;
-  border-radius:50px; /* 🔥 deixa totalmente arredondado */
-  font-size:12px;
-  cursor:pointer;
-  font-weight:bold;
-  transition:0.3s;
+.card:hover {
+  border-color: rgba(255,215,0,0.25);
+  box-shadow: 0 4px 20px rgba(255,215,0,0.08);
 }
 
-.btn-ativar{
-  background:#00ff88;
-  color:#000;
+/* Card premiação */
+.card-premiacao {
+  border-color: rgba(255,215,0,0.3);
+  background: linear-gradient(135deg, #111 80%, #1a1500);
 }
 
-.btn-inativar{
-  background:#ff4d4d;
-  color:#fff;
+/* Card sorteio — ouro suave, sem verde */
+.card-sorteio {
+  border-color: rgba(255,215,0,0.3);
+  background: linear-gradient(135deg, #111 80%, #141000);
 }
 
-.btn-acao:hover{
-  transform:scale(1.05);
-  box-shadow:0 0 8px rgba(255,255,255,0.3);
+/* =====================================
+   🔥 FOTO CLIENTE
+===================================== */
+.card img {
+  width: 56px;
+  height: 70px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 2px solid rgba(255,215,0,0.5);
+  flex-shrink: 0;
 }
 
-/* ANIMAÇÃO */
-@keyframes fadeIn{
-  from{
-    opacity:0;
-    transform:translateY(15px);
+/* =====================================
+   🔥 INFO DENTRO DO CARD
+===================================== */
+.info {
+  flex: 1;
+  text-align: left;
+}
+
+.info h3 {
+  margin: 0 0 5px 0;
+  font-size: 15px;
+  color: #fff;
+  font-weight: bold;
+}
+
+.info p {
+  margin: 3px 0;
+  font-size: 12px;
+  color: #bbb;
+  line-height: 1.45;
+}
+
+.info strong {
+  color: rgba(255,215,0,0.9);
+  font-weight: bold;
+}
+
+/* =====================================
+   🔥 STATUS
+===================================== */
+.status { font-weight: bold; font-size: 12px; }
+.ativo   { color: rgba(255,215,0,0.9); }
+.inativo { color: #666; }
+
+/* =====================================
+   🔥 TAGS
+===================================== */
+.tag-ativo {
+  display: inline-block;
+  color: rgba(255,215,0,0.9);
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.tag-inativo {
+  display: inline-block;
+  color: #444;
+  font-size: 11px;
+}
+
+/* =====================================
+   🔥 ÁREA DE AÇÃO
+===================================== */
+.acao {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 7px;
+  flex-shrink: 0;
+}
+
+/* =====================================
+   🔥 BOTÕES DE AÇÃO
+===================================== */
+.btn-acao {
+  padding: 8px 15px;
+  border: none;
+  border-radius: 50px;
+  font-size: 12px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: .25s;
+  white-space: nowrap;
+}
+
+.btn-acao:hover { transform: scale(1.05); }
+
+/* Dourado — principal */
+.btn-ativar {
+  background: linear-gradient(135deg, #b8860b, #ffd700);
+  color: #111;
+  box-shadow: 0 2px 8px rgba(255,215,0,0.2);
+}
+
+/* Vermelho — inativar */
+.btn-inativar {
+  background: linear-gradient(135deg, #8b0000, #cc2200);
+  color: #fff;
+}
+
+/* Escuro — secundário */
+.btn-detalhes {
+  background: #1c1c1c;
+  color: #ccc;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+/* Config — outline dourado */
+.btn-config {
+  padding: 7px 14px;
+  border-radius: 50px;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: .25s;
+  background: transparent;
+  color: rgba(255,215,0,0.8);
+  border: 1px solid rgba(255,215,0,0.35);
+  white-space: nowrap;
+}
+
+.btn-config:hover {
+  background: rgba(255,215,0,0.1);
+  color: gold;
+  border-color: gold;
+}
+
+/* =====================================
+   🔥 BOTÃO HISTÓRICO (três pontos) TOPO
+===================================== */
+.btn-historico-topo {
+  align-self: flex-end;
+  margin-left: auto;
+  padding: 8px 16px;
+  border: 1px solid rgba(255,215,0,0.25);
+  border-radius: 50px;
+  background: transparent;
+  color: rgba(255,215,0,0.7);
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: .25s;
+  letter-spacing: 0.03em;
+}
+
+.btn-historico-topo:hover {
+  background: rgba(255,215,0,0.08);
+  color: gold;
+  border-color: rgba(255,215,0,0.5);
+}
+
+/* =====================================
+   🔥 BOTÃO VER MAIS
+===================================== */
+.btn-ver-mais {
+  width: 100%;
+  padding: 12px;
+  border: 1px dashed rgba(255,215,0,0.25);
+  border-radius: 50px;
+  background: transparent;
+  color: rgba(255,215,0,0.6);
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: .25s;
+  margin-top: 4px;
+  letter-spacing: 0.03em;
+}
+
+.btn-ver-mais:hover {
+  background: rgba(255,215,0,0.06);
+  border-color: rgba(255,215,0,0.45);
+  color: gold;
+}
+
+/* =====================================
+   🔥 SEÇÃO TÍTULO
+===================================== */
+.secao-titulo {
+  font-size: 12px;
+  font-weight: bold;
+  color: rgba(255,215,0,0.7);
+  text-align: left;
+  padding: 5px 2px;
+  border-bottom: 1px solid rgba(255,215,0,0.1);
+  margin: 6px 0 10px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* =====================================
+   🔥 BADGE PREMIAÇÃO
+===================================== */
+.badge-premiacao {
+  display: inline-block;
+  background: linear-gradient(135deg, #7a5500, #c9a100);
+  color: #ffe066;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 3px 10px;
+  border-radius: 50px;
+  margin-top: 5px;
+  letter-spacing: 0.04em;
+  border: 1px solid rgba(255,215,0,0.3);
+}
+
+/* =====================================
+   🔥 PROGRESSO BAR (sorteio)
+===================================== */
+.progresso-wrap {
+  margin-top: 6px;
+}
+
+.progresso-label {
+  font-size: 11px;
+  color: #aaa;
+  margin-bottom: 4px;
+  text-align: left;
+}
+
+.progresso-bar {
+  width: 100%;
+  height: 4px;
+  background: #222;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progresso-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #7a5500, #ffd700);
+  border-radius: 4px;
+  transition: width .4s ease;
+}
+
+/* =====================================
+   🔥 MODAL
+===================================== */
+.modal {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0,0,0,0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  padding: 20px;
+}
+
+.modal-box {
+  width: 100%;
+  max-width: 520px;
+  max-height: 85vh;
+  overflow-y: auto;
+  background: #111;
+  border: 1px solid rgba(255,215,0,0.15);
+  border-radius: 20px;
+  padding: 20px;
+  animation: fadeIn .25s ease;
+}
+
+.modal-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  border-bottom: 1px solid rgba(255,215,0,0.1);
+  padding-bottom: 14px;
+}
+
+.modal-topo h3 {
+  color: gold;
+  margin: 0;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+}
+
+.fechar-modal {
+  width: 32px; height: 32px;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 50%;
+  background: #1c1c1c;
+  color: #aaa;
+  cursor: pointer;
+  font-size: 14px;
+  transition: .3s;
+}
+
+.fechar-modal:hover {
+  background: #cc2200;
+  color: #fff;
+  border-color: transparent;
+}
+
+#conteudoModal {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.linha-historico {
+  background: #151515;
+  border: 1px solid rgba(255,215,0,0.08);
+  border-radius: 12px;
+  padding: 12px 14px;
+  text-align: left;
+}
+
+.linha-historico strong { color: rgba(255,215,0,0.85); }
+
+/* =====================================
+   🔥 PAINEL LATERAL CONFIG
+===================================== */
+.painel-config-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.65);
+  z-index: 999;
+}
+
+.painel-config-box {
+  position: fixed;
+  top: 0;
+  right: -420px;
+  width: 380px;
+  max-width: 96vw;
+  height: 100vh;
+  background: #0f0f0f;
+  color: #fff;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -8px 0 40px rgba(0,0,0,0.6);
+  border-left: 1px solid rgba(255,215,0,0.2);
+  transition: right .32s cubic-bezier(.4,0,.2,1);
+}
+
+.painel-config-box.aberto { right: 0; }
+
+.painel-config-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 22px 20px 16px;
+  border-bottom: 1px solid rgba(255,215,0,0.1);
+  flex-wrap: wrap;
+}
+
+.painel-config-header h3 {
+  margin: 0;
+  font-size: 14px;
+  color: gold;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.painel-config-nome {
+  font-size: 12px;
+  color: #888;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.painel-config-fechar {
+  width: 30px; height: 30px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 50%;
+  background: #1c1c1c;
+  color: #aaa;
+  cursor: pointer;
+  font-size: 13px;
+  transition: .3s;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.painel-config-fechar:hover {
+  background: #cc2200;
+  color: #fff;
+  border-color: transparent;
+}
+
+.painel-config-body {
+  flex: 1;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+}
+
+.painel-config-body label {
+  font-size: 11px;
+  font-weight: bold;
+  color: rgba(255,215,0,0.7);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-top: 8px;
+}
+
+.painel-config-body input {
+  padding: 10px 13px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,215,0,0.2);
+  background: #161616;
+  color: #fff;
+  font-size: 14px;
+  outline: none;
+  transition: border .2s, box-shadow .2s;
+  width: 100%;
+}
+
+.painel-config-body input:focus {
+  border-color: rgba(255,215,0,0.6);
+  box-shadow: 0 0 10px rgba(255,215,0,0.15);
+}
+
+.painel-config-body small {
+  color: #555;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.painel-config-footer {
+  padding: 14px 20px 28px;
+  border-top: 1px solid rgba(255,215,0,0.1);
+}
+
+.painel-config-footer .btn-acao {
+  width: 100%;
+  padding: 13px;
+  font-size: 14px;
+  border-radius: 50px;
+}
+
+/* =====================================
+   🔥 SEÇÕES CONFIG
+===================================== */
+.config-secao {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #141414;
+  border: 1px solid rgba(255,215,0,0.08);
+  border-radius: 12px;
+  padding: 14px;
+  margin-top: 10px;
+}
+
+.config-secao-titulo {
+  font-size: 11px;
+  font-weight: bold;
+  color: gold;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 6px;
+  border-bottom: 1px solid rgba(255,215,0,0.08);
+  padding-bottom: 6px;
+}
+
+.config-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.config-toggle-row label:first-child {
+  font-size: 13px;
+  color: #ccc;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: normal;
+}
+
+/* =====================================
+   🔥 TOGGLE SWITCH
+===================================== */
+.toggle {
+  position: relative;
+  display: inline-block;
+  width: 42px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.toggle input { opacity: 0; width: 0; height: 0; }
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background: #222;
+  border-radius: 22px;
+  transition: .3s;
+  border: 1px solid rgba(255,215,0,0.15);
+}
+
+.slider:before {
+  content: "";
+  position: absolute;
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background: #555;
+  border-radius: 50%;
+  transition: .3s;
+}
+
+.toggle input:checked + .slider {
+  background: rgba(255,215,0,0.15);
+  border-color: rgba(255,215,0,0.6);
+}
+
+.toggle input:checked + .slider:before {
+  background: gold;
+  transform: translateX(20px);
+}
+
+/* =====================================
+   🔥 CARD HISTÓRICO (dentro da lista)
+===================================== */
+.card-historico {
+  background: #111;
+  border: 1px solid rgba(255,215,0,0.08);
+  border-radius: 14px;
+  padding: 14px 16px;
+  text-align: left;
+  animation: fadeIn .3s ease;
+  transition: border-color .2s;
+}
+
+.card-historico:hover {
+  border-color: rgba(255,215,0,0.2);
+}
+
+.card-historico h3 {
+  margin: 0 0 5px 0;
+  font-size: 14px;
+  color: #fff;
+}
+
+.card-historico p {
+  margin: 3px 0;
+  font-size: 12px;
+  color: #999;
+}
+
+.card-historico .hist-data {
+  font-size: 11px;
+  color: rgba(255,215,0,0.5);
+  margin-top: 6px;
+}
+
+/* =====================================
+   🔥 UTILITÁRIOS
+===================================== */
+.hidden { display: none !important; }
+
+/* =====================================
+   🔥 ANIMAÇÃO
+===================================== */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* =====================================
+   🔥 RESPONSIVO
+===================================== */
+@media (max-width: 700px) {
+  .card { align-items: flex-start; }
+  .acao { align-self: flex-end; }
+  .btn-acao { padding: 7px 12px; font-size: 11px; }
+  .info h3 { font-size: 14px; }
+  .info p  { font-size: 12px; }
+  .painel-config-box {
+    width: 100vw;
+    border-left: none;
+    border-top: 1px solid rgba(255,215,0,0.2);
   }
-  to{
-    opacity:1;
-    transform:translateY(0);
+  .btn-historico-topo {
+    font-size: 12px;
+    padding: 7px 13px;
   }
 }

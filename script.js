@@ -58,6 +58,7 @@ let empresaConfig = {
   metaSorteio: 10,
   qtdSorteio: 5
 };
+
 // 🔥 BUSCAR CONFIG DA EMPRESA
 async function carregarConfigEmpresa() {
 
@@ -70,9 +71,17 @@ async function carregarConfigEmpresa() {
     // 🔥 se já existe config
     if (snap.exists()) {
 
+      const dadosEmpresa = snap.data();
+
       empresaConfig = {
         ...empresaConfig,
-        ...snap.data()
+        ...dadosEmpresa,
+
+        // 🔥 padroniza nome da empresa
+        nomeEmpresa:
+          dadosEmpresa.nomeEmpresa ||
+          dadosEmpresa.nome ||
+          "Empresa"
       };
 
     } else {
@@ -625,7 +634,9 @@ async function carregarHistorico() {
 
   }
 
-}/// 🔥 ÚLTIMAS VALIDAÇÕES + SORTEIO + TOPO CORRETO
+}
+
+// 🔥 ÚLTIMAS VALIDAÇÕES + SORTEIO + TOPO CORRETO
 async function carregarUltimasValidacoes() {
 
   const box = document.getElementById("listaUltimos");
@@ -1138,18 +1149,18 @@ window.validar = async () => {
   }
 
   if (!tipoDesconto.value) {
-  mostrarMensagem("Selecione o desconto primeiro ❗");
-  return;
-}
+    mostrarMensagem("Selecione o desconto primeiro ❗");
+    return;
+  }
 
-if (
-  tipoDesconto.value === "manual" &&
-  !descontoInput.value.trim()
-) {
-  mostrarMensagem("Digite o desconto manual ❗");
-  descontoInput.focus();
-  return;
-}
+  if (
+    tipoDesconto.value === "manual" &&
+    !descontoInput.value.trim()
+  ) {
+    mostrarMensagem("Digite o desconto manual ❗");
+    descontoInput.focus();
+    return;
+  }
 
   let valor = valorInput.value
     .replace("R$", "")
@@ -1194,10 +1205,21 @@ if (
       {
         clienteId: clienteAtual.id,
         clienteNome: clienteAtual.nome || "",
+
+        // 🔥 EMPRESA
         empresa: empresaLogada,
+
+empresaNome:
+  empresaConfig?.nomeEmpresa ||
+  empresaConfig?.nome ||
+  "Empresa",
+  
+        // 🔥 VENDA
         valor,
         desconto,
         total,
+
+        // 🔥 DATA
         data: agora.toLocaleDateString("pt-BR"),
         hora: agora.toLocaleTimeString("pt-BR"),
         timestamp: agoraMs
@@ -1215,18 +1237,31 @@ if (
         Number(dadosEmpresaCliente.usos || 0) + 1;
 
       const atualizar = {
+
+        // 🔥 EMPRESA
+        empresaNome:
+          empresaConfig?.nomeEmpresa || "Empresa",
+
+        // 🔥 DADOS
         totalGasto: increment(total),
         usos: increment(1),
+
+        // 🔥 ÚLTIMA VALIDAÇÃO
         ultimaValidacao: agoraMs,
+
         ultimaData:
           agora.toLocaleDateString("pt-BR"),
+
         ultimaHora:
           agora.toLocaleTimeString("pt-BR"),
+
+        // 🔥 CLIENTE
         nome: clienteAtual.nome || "",
         foto: clienteAtual.foto || ""
+
       };
 
-      // 🔥 PARTICIPA DO SORTEIO COM 3 COMPRAS
+      // 🔥 PARTICIPA DO SORTEIO
       if (usosAtual >= 3) {
         atualizar.aptoSorteio = true;
       }
@@ -1248,24 +1283,37 @@ if (
         collection(db, "clientesEmpresa"),
         {
           clienteId: clienteAtual.id,
+
+          // 🔥 EMPRESA
           empresa: empresaLogada,
+          empresaNome:
+            empresaConfig?.nomeEmpresa || "Empresa",
+
+          // 🔥 CLIENTE
           nome: clienteAtual.nome || "",
           foto: clienteAtual.foto || "",
+
+          // 🔥 DADOS
           totalGasto: total,
           usos: 1,
+
           brindesEntregues: 0,
           premiado: false,
           aptoSorteio: false,
           sorteado: false,
+
+          // 🔥 ÚLTIMA VALIDAÇÃO
           ultimaValidacao: agoraMs,
+
           ultimaData:
             agora.toLocaleDateString("pt-BR"),
+
           ultimaHora:
             agora.toLocaleTimeString("pt-BR")
         }
       );
 
-    }
+    } // 🔥 FECHAMENTO DO ELSE
 
     // ==========================================
     // ALERTA BRINDE
@@ -1273,23 +1321,25 @@ if (
     if (usosAtual % 10 === 0) {
 
       mostrarMensagem(
-        ` ${clienteAtual.nome || "Cliente"} atingiu ${usosAtual} compras!`
+        `${clienteAtual.nome || "Cliente"} atingiu ${usosAtual} compras!`
       );
 
     }
 
     // 🔥 ALERTA SORTEIO
-    const metaSorteio = Number(empresaConfig?.metaSorteio || 10);
-if (usosAtual === metaSorteio) {
+    const metaSorteio =
+      Number(empresaConfig?.metaSorteio || 10);
 
-  mostrarMensagem(
-    `${clienteAtual.nome || "Cliente"} atingiu ${metaSorteio} compras e entrou no sorteio!`
-  );
+    if (usosAtual === metaSorteio) {
 
-}
-    
-cacheUltimasHTML = "";
-cacheUltimasTempo = 0;
+      mostrarMensagem(
+        `${clienteAtual.nome || "Cliente"} atingiu ${metaSorteio} compras e entrou no sorteio!`
+      );
+
+    }
+
+    cacheUltimasHTML = "";
+    cacheUltimasTempo = 0;
 
     await carregarUltimasValidacoes();
 
@@ -1336,6 +1386,7 @@ cacheUltimasTempo = 0;
   } catch (erro) {
 
     console.error("Erro validar:", erro);
+
     mostrarMensagem("Erro ao validar ❌");
 
   } finally {
@@ -1346,7 +1397,6 @@ cacheUltimasTempo = 0;
   }
 
 };
-
 // 🔄 VOLTAR
 window.voltar = async () => {
 
