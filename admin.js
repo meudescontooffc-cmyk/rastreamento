@@ -169,13 +169,7 @@ function paginar(itens, renderFn) {
 ========================================= */
 
 estadoSelect.addEventListener("change", () => {
-  estadoInput.value = estadoSelect.value;
   numeros[0].focus();
-});
-
-estadoInput.addEventListener("input", () => {
-  estadoInput.value = estadoInput.value.toUpperCase().replace(/[^A-Z]/g, "");
-  if (estadoInput.value.length === 2) numeros[0].focus();
 });
 
 numeros.forEach((input, i) => {
@@ -195,7 +189,7 @@ numeros.forEach((input, i) => {
 ========================================= */
 
 async function gerarCodigoUnico() {
-  const estado = estadoInput.value.trim().toUpperCase() || "MA";
+  const estado = estadoSelect.value.trim().toUpperCase() || "MA";
   while (true) {
     const num    = Math.floor(100000 + Math.random() * 900000);
     const codigo = `${estado}-${num}`;
@@ -313,7 +307,8 @@ window.inativar = async function(docId) {
 ========================================= */
 
 function pegarCodigo() {
-  return estadoInput.value.trim().toUpperCase() + "-" + numeros.map(n => n.value).join("");
+  // Usa o select de UF (não o input digitável)
+  return estadoSelect.value.trim().toUpperCase() + "-" + numeros.map(n => n.value).join("");
 }
 
 window.buscar = async function() {
@@ -532,59 +527,41 @@ window.verPremiacoes = async function() {
     btnHist.onclick = () => verHistoricoPromocoes("premiacao");
     lista.appendChild(btnHist);
 
-    // ── Busca pendentes E histórico recente em paralelo
-    const [snapPend, snapHist] = await Promise.all([
-      getDocs(query(collection(db, "clientesEmpresa"), where("premiacaoPendente", "==", true))),
-      getDocs(collection(db, "historicoPromocoes"))
+    // ── Busca clientes e empresas em paralelo (histórico não é mais necessário aqui)
+    const [snapClientes, snapEmpresas] = await Promise.all([
+      getDocs(collection(db, "clientesEmpresa")),
+      getDocs(collection(db, "empresas"))
     ]);
 
-    // ── Histórico recente de premiações (últimas 10 confirmadas)
-    const historico = snapHist.docs
-      .map(d => d.data())
-      .filter(d => d.tipo === "premiacao")
-      .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
-      .slice(0, 10);
-
-    // ════════════════════════════
-    //  SEÇÃO 1 — PREMIAÇÕES FEITAS
-    // ════════════════════════════
-    const tHist = document.createElement("p");
-    tHist.className = "secao-titulo";
-    tHist.textContent = " Premiações realizadas (recentes)";
-    lista.appendChild(tHist);
-
-    if (!historico.length) {
-      const ph = document.createElement("p");
-      ph.style.cssText = "color:#666;font-size:13px;margin:8px 0 20px";
-      ph.textContent = "Nenhuma premiação realizada ainda.";
-      lista.appendChild(ph);
-    } else {
-      historico.forEach(h => {
-        const card = document.createElement("div");
-        card.className = "card";
-        card.style.borderLeft = "3px solid #4caf50";
-        card.innerHTML = `
-          <div class="info" style="flex:1">
-            <h3>🎁 ${sanitize(h.nomeCliente || h.clienteId)}</h3>
-            <p style="margin:3px 0"><strong>Empresa:</strong> ${sanitize(h.nomeEmpresa || h.empresa)}</p>
-            <p style="margin:3px 0;font-size:12px;color:#aaa"><strong>ID:</strong> ${sanitize(h.clienteId || "—")}</p>
-            <p style="color:rgba(100,255,100,0.5);font-size:11px;margin-top:6px">✅ Empresa fez premiação · 🕐 ${sanitize(h.data || "--")} às ${sanitize(h.hora || "--")}</p>
-          </div>`;
-        lista.appendChild(card);
-      });
-    }
+    // Mapa empresaId → metaBrinde
+    const metaMap = {};
+    snapEmpresas.docs.forEach(d => {
+      metaMap[d.id] = Number(d.data().metaBrinde || 0);
+    });
 
     // ════════════════════════════════════════
-    //  SEÇÃO 2 — CLIENTES QUE ATINGIRAM META
-    //  (pendentes — empresa ainda não premiou)
+    //  CLIENTES COM BRINDES PENDENTES
+    //  Lógica acumulativa: Math.floor(usos/meta) > ciclosBrinde
+    //  Não zera usos — a cada +meta compras ganha mais um brinde
     // ════════════════════════════════════════
     const tPend = document.createElement("p");
     tPend.className = "secao-titulo";
-    tPend.style.marginTop = "24px";
+    tPend.style.marginTop = "8px";
+    lista.appendChild(tPend);
 
-    if (snapPend.empty) {
+    // Filtra clientes com brindes pendentes usando ciclosBrinde
+    const pendentes = snapClientes.docs
+      .map(d => ({ docId: d.id, ...d.data() }))
+      .filter(d => {
+        const meta = metaMap[d.empresa];
+        if (!meta || meta <= 0) return false;
+        const usos         = Number(d.usos || 0);
+        const ciclosBrinde = Number(d.ciclosBrinde || 0);
+        return Math.floor(usos / meta) > ciclosBrinde;
+      });
+
+    if (!pendentes.length) {
       tPend.textContent = " Clientes aguardando premiação";
-      lista.appendChild(tPend);
       const pp = document.createElement("p");
       pp.style.cssText = "color:#666;font-size:13px;margin-top:8px";
       pp.textContent = "Nenhum cliente aguardando premiação.";
@@ -592,55 +569,42 @@ window.verPremiacoes = async function() {
       return;
     }
 
-    // Agrupa por empresa
-    const mapaEmp = {};
-    snapPend.forEach(docu => {
-      const d   = docu.data();
-      const eId = d.empresa;
-      if (!mapaEmp[eId]) {
-        mapaEmp[eId] = {
-          eId,
-          nomeEmpresa: d.empresaNome || d.nomeEmpresa || eId,
-          clientes: []
-        };
-      }
-      mapaEmp[eId].clientes.push({ docId: docu.id, ...d });
-    });
+    tPend.textContent = ` Clientes com brinde pendente (${pendentes.length} cliente${pendentes.length > 1 ? "s" : ""})`;
 
-    const grupos = Object.values(mapaEmp);
-    tPend.textContent = ` Clientes que atingiram os requisitos (${grupos.reduce((a,g)=>a+g.clientes.length,0)} cliente${grupos.reduce((a,g)=>a+g.clientes.length,0)>1?"s":""})`;
-    lista.appendChild(tPend);
+    renderPaginado(lista, pendentes, d => {
+      const meta         = metaMap[d.empresa] || 1;
+      const usos         = Number(d.usos || 0);
+      const ciclosBrinde = Number(d.ciclosBrinde || 0);
+      const brindesPend  = Math.floor(usos / meta) - ciclosBrinde;
 
-    // Mostra direto os clientes (sem agrupamento por empresa)
-    grupos.forEach(g => {
-      g.clientes.forEach(d => {
-        const card = document.createElement("div");
-        card.className = "card card-premiacao";
-        card.id = `pend-${d.docId}`;
-        card.style.borderLeft = "3px solid #ff9800";
-        const nEmp = sanitize(g.nomeEmpresa);
-        const nCli = sanitize(d.nome || d.clienteId);
-        const sId  = sanitize(d.clienteId || "");
-        const sDocId = sanitize(d.docId);
-        const sEId   = sanitize(g.eId);
-        const horaAtingiu = d.ultimaData && d.ultimaHora ? `${d.ultimaData} às ${d.ultimaHora}` : "--";
-        card.innerHTML = `
-          <div class="info" style="flex:1">
-            <p style="font-size:11px;color:#ff9800;font-weight:600;margin-bottom:4px">⚠️ Cliente atingiu os requisitos</p>
-            <h3>${nCli}</h3>
-            <p style="margin:3px 0"><strong>Empresa:</strong> ${nEmp}</p>
-            <p style="margin:3px 0;font-size:12px;color:#aaa"><strong>ID:</strong> ${sId}</p>
-            <p style="margin:3px 0;font-size:12px"><strong>Compras:</strong> ${d.usos || 0}</p>
-            <p style="color:rgba(255,152,0,0.6);font-size:11px;margin-top:6px">🕐 Última compra: ${horaAtingiu}</p>
-          </div>
-          <div class="acao">
-            <button class="btn-acao btn-ativar"
-              onclick="confirmarPremiacao('${sDocId}','${sEId}','${sId}','${nEmp}','${nCli}')">
-               OK
-            </button>
-          </div>`;
-        lista.appendChild(card);
-      });
+      const card = document.createElement("div");
+      card.className = "card card-premiacao";
+      card.id = `pend-${d.docId}`;
+      card.style.borderLeft = "3px solid #ff9800";
+
+      const nEmp   = sanitize(d.empresaNome || d.empresa || "");
+      const nCli   = sanitize(d.nome || d.clienteId);
+      const sId    = sanitize(d.clienteId || "");
+      const sDocId = sanitize(d.docId);
+      const sEId   = sanitize(d.empresa || "");
+      const horaAt = d.ultimaData && d.ultimaHora ? `${d.ultimaData} às ${d.ultimaHora}` : "--";
+
+      card.innerHTML = `
+        <div class="info" style="flex:1">
+          <p style="font-size:11px;color:#ff9800;font-weight:600;margin-bottom:4px">⚠ Cliente atingiu os requisitos</p>
+          <h3>${nCli}</h3>
+          <p style="margin:3px 0"><strong>Empresa:</strong> ${nEmp}</p>
+          <p style="margin:3px 0;font-size:12px;color:#aaa"><strong>ID:</strong> ${sId}</p>
+          <p style="margin:3px 0;font-size:12px"><strong>Compras totais:</strong> ${usos} &nbsp;|&nbsp; <strong>Brindes pendentes:</strong> ${brindesPend}</p>
+          <p style="color:rgba(255,152,0,0.6);font-size:11px;margin-top:6px"> Última compra: ${horaAt}</p>
+        </div>
+        <div class="acao">
+          <button class="btn-acao btn-ativar"
+            onclick="confirmarPremiacao('${sDocId}','${sEId}','${sId}','${nEmp}','${nCli}')">
+             OK
+          </button>
+        </div>`;
+      lista.appendChild(card);
     });
 
   } catch (e) { console.error(e); lista.innerHTML = "Erro ao carregar ❌"; }
@@ -707,7 +671,19 @@ window.confirmarPremiacao = async function(docId, eId, clienteId, nomeEmpresa, n
   if (!confirm(`Confirmar premiação para ${nomeCliente}?`)) return;
   const { data, hora } = agora();
   try {
-    await updateDoc(doc(db, "clientesEmpresa", docId), { premiacaoPendente: false });
+    // Busca dados atuais do cliente para calcular o novo ciclosBrinde
+    const cliSnap  = await getDoc(doc(db, "clientesEmpresa", docId));
+    const cliData  = cliSnap.exists() ? cliSnap.data() : {};
+    const empSnap  = await getDoc(doc(db, "empresas", eId));
+    const meta     = Number(empSnap.exists() ? empSnap.data().metaBrinde : 0) || 1;
+    const usos     = Number(cliData.usos || 0);
+    // Avança ciclosBrinde para o ciclo atual — próxima premiação só após mais +meta compras
+    const novoCiclo = Math.floor(usos / meta);
+
+    await updateDoc(doc(db, "clientesEmpresa", docId), {
+      ciclosBrinde: novoCiclo,
+      premiacaoPendente: false   // mantido por retrocompatibilidade
+    });
     await addDoc(collection(db, "historicoPromocoes"), {
       tipo: "premiacao", empresa: eId, nomeEmpresa,
       clienteId, nomeCliente, data, hora, timestamp: Date.now()
@@ -767,7 +743,11 @@ window.verSorteios = async function() {
         collection(db, "clientesEmpresa"),
         where("empresa", "==", eId)
       ));
-      const total  = snapCli.docs.filter(d => Number(d.data().usos || 0) >= metaCompras).length;
+      const total  = snapCli.docs.filter(d => {
+        const usos  = Number(d.data().usos || 0);
+        const ciclo = Number(d.data().ciclosSorteio || 0);
+        return Math.floor(usos / metaCompras) > ciclo;
+      }).length;
       const pronto = total >= metaClientes;
 
       algum = true;
@@ -821,8 +801,12 @@ window.verParticipantesSorteio = async function(eId, nomeEmpresa, metaCompras) {
       where("empresa", "==", eId)
     ));
     const elegiveis = snap.docs
-      .filter(d => Number(d.data().usos || 0) >= metaCompras)
-      .map(d => d.data());
+      .map(d => d.data())
+      .filter(d => {
+        const usos  = Number(d.usos || 0);
+        const ciclo = Number(d.ciclosSorteio || 0);
+        return Math.floor(usos / metaCompras) > ciclo;
+      });
 
     lista.innerHTML = "";
     const voltar = document.createElement("button");
@@ -847,11 +831,15 @@ window.verParticipantesSorteio = async function(eId, nomeEmpresa, metaCompras) {
     renderPaginado(lista, elegiveis, (d) => {
       const card = document.createElement("div");
       card.className = "card";
+      const _usos  = Number(d.usos || 0);
+      const _ciclo = Number(d.ciclosSorteio || 0);
+      const _participacoes = Math.floor(_usos / metaCompras) - _ciclo;
       card.innerHTML = `
         <div class="info">
-          <h3>${d.nome || d.clienteId}</h3>
-          <p><strong>ID:</strong> ${d.clienteId}</p>
-          <p><strong>Compras:</strong> ${d.usos || 0}</p>
+          <h3>${sanitize(d.nome || d.clienteId)}</h3>
+          <p><strong>ID:</strong> ${sanitize(d.clienteId)}</p>
+          <p><strong>Compras totais:</strong> ${_usos}</p>
+          <p><strong>Participações disponíveis:</strong> ${_participacoes}</p>
           <span class="tag-ativo">✦ Elegível</span>
         </div>`;
       lista.appendChild(card);
@@ -868,8 +856,13 @@ window.realizarSorteio = async function(eId, nomeEmpresa, qtdGanhadores, metaCom
       where("empresa", "==", eId)
     ));
     const elegiveis = snap.docs
-      .filter(d => Number(d.data().usos || 0) >= metaCompras)
-      .map(d => ({ id: d.id, data: d.data() }));
+      .map(d => ({ id: d.id, data: d.data() }))
+      .filter(e => {
+        const usos  = Number(e.data.usos || 0);
+        const ciclo = Number(e.data.ciclosSorteio || 0);
+        // elegível se já completou mais ciclos do que já participou
+        return Math.floor(usos / metaCompras) > ciclo;
+      });
 
     if (!elegiveis.length) { alert("Nenhum cliente elegível ❗"); return; }
 
@@ -877,12 +870,17 @@ window.realizarSorteio = async function(eId, nomeEmpresa, qtdGanhadores, metaCom
     const nomes      = ganhadores.map(g => g.data.nome || g.data.clienteId);
     const ids        = ganhadores.map(g => g.data.clienteId);
 
-    if (!confirm(`Ganhadores:\n${nomes.join("\n")}\n\nConfirmar e zerar contagem?`)) return;
+    if (!confirm(`Ganhadores:\n${nomes.join("\n")}\n\nConfirmar sorteio?`)) return;
 
     const { data, hora } = agora();
 
+    // Não zera usos — registra até qual ciclo o cliente já participou.
+    // ciclosSorteio = Math.floor(usos / meta) → próximo sorteio só quando usos
+    // avançar para o ciclo seguinte (ou seja, comprar mais X vezes).
     await Promise.all(
-      elegiveis.map(e => updateDoc(doc(db, "clientesEmpresa", e.id), { usos: 0 }))
+      elegiveis.map(e => updateDoc(doc(db, "clientesEmpresa", e.id), {
+        ciclosSorteio: Math.floor(Number(e.data.usos || 0) / metaCompras)
+      }))
     );
     await addDoc(collection(db, "historicoPromocoes"), {
       tipo: "sorteio", empresa: eId, nomeEmpresa,
@@ -945,18 +943,18 @@ window.verHistoricoPromocoes = async function(tipo) {
         const ids   = (h.idsGanhadores || []).map(i => sanitize(i)).join(", ");
         card.innerHTML = `
           <div class="info">
-            <h3>🏆 ${sanitize(h.nomeEmpresa || h.empresa)}</h3>
+            <h3> ${sanitize(h.nomeEmpresa || h.empresa)}</h3>
             <p style="margin:4px 0"><strong>Ganhadores:</strong> ${nomes || "—"}</p>
             ${ids ? `<p style="margin:4px 0;font-size:12px;color:#aaa"><strong>IDs:</strong> ${ids}</p>` : ""}
-            <p style="color:rgba(255,215,0,0.5);font-size:11px;margin-top:8px">🕐 ${sanitize(h.data || "--")} às ${sanitize(h.hora || "--")}</p>
+            <p style="color:rgba(255,215,0,0.5);font-size:11px;margin-top:8px"> ${sanitize(h.data || "--")} às ${sanitize(h.hora || "--")}</p>
           </div>`;
       } else {
         card.innerHTML = `
           <div class="info">
-            <h3>🎁 ${sanitize(h.nomeCliente || h.clienteId)}</h3>
+            <h3> ${sanitize(h.nomeCliente || h.clienteId)}</h3>
             <p style="margin:4px 0"><strong>Empresa:</strong> ${sanitize(h.nomeEmpresa || h.empresa)}</p>
             <p style="margin:4px 0"><strong>ID:</strong> ${sanitize(h.clienteId || "—")}</p>
-            <p style="color:rgba(255,215,0,0.5);font-size:11px;margin-top:8px">🕐 ${sanitize(h.data || "--")} às ${sanitize(h.hora || "--")}</p>
+            <p style="color:rgba(255,215,0,0.5);font-size:11px;margin-top:8px"> ${sanitize(h.data || "--")} às ${sanitize(h.hora || "--")}</p>
           </div>`;
       }
 

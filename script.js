@@ -689,10 +689,11 @@ async function carregarUltimasValidacoes() {
       const d = docu.data();
 
       const usos = Number(d.usos || 0);
-      const entregues = Number(d.brindesEntregues || 0);
-
-      const ganhosBrinde = Math.floor(usos / metaBrinde);
-      const pendentesBrinde = ganhosBrinde - entregues;
+      // Lógica acumulativa: ciclosBrinde marca quantas premiações já foram entregues
+      // A cada +metaBrinde compras o cliente ganha mais um brinde
+      const ciclosBrinde    = Number(d.ciclosBrinde || 0);
+      const ganhosBrinde    = Math.floor(usos / metaBrinde);
+      const pendentesBrinde = ganhosBrinde - ciclosBrinde;
 
       const aptoSorteio =
         usos >= metaSorteio &&
@@ -1539,58 +1540,46 @@ window.premiarCliente = async (event, idDoc) => {
 
   try {
 
-    const ref = doc(db, "clientesEmpresa", idDoc);
+    // Busca dados atuais para calcular o novo ciclosBrinde
+    const ref     = doc(db, "clientesEmpresa", idDoc);
+    const cliSnap = await getDoc(ref);
+    const cliData = cliSnap.exists() ? cliSnap.data() : {};
+    const meta    = Number(empresaConfig?.metaBrinde || 10);
+    const usos    = Number(cliData.usos || 0);
+    const novoCiclo = Math.floor(usos / meta);
 
+    const agora = new Date();
+    const dataStr = agora.toLocaleDateString("pt-BR");
+    const horaStr = agora.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+    // Avança ciclosBrinde → cliente sai de pendente no ADM principal
     await updateDoc(ref, {
-      brindesEntregues: increment(1)
+      ciclosBrinde: novoCiclo,
+      premiacaoPendente: false
     });
 
-    const lista = document.getElementById("listaUltimos");
+    // Grava no histórico → aparece no ADM principal em "Histórico de premiações"
+    await addDoc(collection(db, "historicoPromocoes"), {
+      tipo:        "premiacao",
+      empresa:     empresaLogada,
+      nomeEmpresa: empresaConfig?.nomeEmpresa || empresaConfig?.nome || "Empresa",
+      clienteId:   cliData.clienteId || "",
+      nomeCliente: cliData.nome      || cliData.clienteId || "",
+      data:        dataStr,
+      hora:        horaStr,
+      timestamp:   Date.now()
+    });
 
-    lista.innerHTML = `
-      <div style="
-        color:#fff;
-        padding:6px 2px 12px 2px;
-        font-size:14px;
-        font-weight:700;
-        text-align:center;
-      ">
-        Premiação realizada
-      </div>
-    ` + lista.innerHTML;
-
-    // 🔥 limpa cache (IMPORTANTE)
-    cacheUltimasHTML = "";
+    // Limpa cache e recarrega lista
+    cacheUltimasHTML  = "";
     cacheUltimasTempo = 0;
-
-    // 🔥 atualiza lista depois
-    setTimeout(() => {
-      carregarUltimasValidacoes();
-    }, 1200);
+    mostrarMensagem("Premiação realizada ✅");
+    setTimeout(() => carregarUltimasValidacoes(), 800);
 
   } catch (erro) {
-
-    console.error(erro);
-
-    if (btn) {
-      btn.disabled = false;
-      btn.innerText = "Premiar";
-    }
-
-    const lista = document.getElementById("listaUltimos");
-
-    lista.innerHTML = `
-      <div style="
-        color:#fff;
-        padding:6px 2px 12px 2px;
-        font-size:14px;
-        font-weight:700;
-        text-align:center;
-      ">
-        Erro ao premiar
-      </div>
-    ` + lista.innerHTML;
-
+    console.error("Erro ao premiar:", erro);
+    if (btn) { btn.disabled = false; btn.innerText = "Premiar"; }
+    mostrarMensagem("Erro ao premiar ❌");
   }
 
 };
