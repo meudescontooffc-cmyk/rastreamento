@@ -139,7 +139,7 @@ function agora() {
 
 function renderPaginado(container, itens, renderFn, offset = 0) {
   // Remove botão ver mais anterior
-  const old = container.querySelector(".btn-ver-mais");
+  const old = container.querySelector(".btn-ver-mais-wrap");
   if (old) old.remove();
 
   const fatia = itens.slice(offset, offset + PAGE);
@@ -147,14 +147,19 @@ function renderPaginado(container, itens, renderFn, offset = 0) {
 
   const prox = offset + PAGE;
   if (prox < itens.length) {
+    const wrap = document.createElement("div");
+    wrap.className = "btn-ver-mais-wrap";
+    wrap.style.cssText = "width:100%;display:block;clear:both;margin:12px 0;text-align:center;";
     const btn = document.createElement("button");
     btn.className = "btn-ver-mais";
+    btn.style.cssText = "display:inline-block;width:auto;min-width:160px;max-width:100%;";
     btn.textContent = `Ver mais (${itens.length - prox} restantes)`;
     btn.onclick = () => {
-      btn.remove();
+      wrap.remove();
       renderPaginado(container, itens, renderFn, prox);
     };
-    container.appendChild(btn);
+    wrap.appendChild(btn);
+    container.appendChild(wrap);
   }
 }
 
@@ -362,17 +367,18 @@ window.verEmpresas = async function() {
 
       const card = document.createElement("div");
       card.className = "card";
+      card.style.cssText = "display:flex;align-items:flex-start;gap:10px;flex-wrap:nowrap;";
       card.innerHTML = `
-        <div class="info" style="flex:1">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-            <h3 style="margin:0">${d.nome || "Empresa sem nome"}</h3>
-            <button class="btn-acao btn-config" onclick="abrirConfigEmpresa('${eId}')">⚙ Config</button>
-          </div>
-          <p style="margin:5px 0 2px;color:#aaa;font-size:12px">${d.email || ""}</p>
-          <div style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap">${tagB} ${tagS}</div>
+        <div class="info" style="flex:1;min-width:0;">
+          <h3 style="margin:0 0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${d.nome || "Empresa sem nome"}</h3>
+          <p style="margin:2px 0 4px;color:#aaa;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${d.email || ""}</p>
+          <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">${tagB} ${tagS}</div>
           ${d.metaBrinde  ? `<p style="margin:4px 0;font-size:13px"><strong>Meta brinde:</strong> ${d.metaBrinde} compras</p>` : ""}
           ${(d.metaUsosSorteio || d.metaComprasSorteio) ? `<p style="margin:4px 0;font-size:13px"><strong>Usos p/ participar:</strong> ${d.metaUsosSorteio || d.metaComprasSorteio} compras</p>` : ""}
           ${d.metaClientesSorteio ? `<p style="margin:4px 0;font-size:13px"><strong>Meta clientes elegíveis:</strong> ${d.metaClientesSorteio} — ${d.qtdSorteio || 1} ganhador(es)</p>` : ""}
+        </div>
+        <div class="acao" style="flex-shrink:0;display:flex;align-items:flex-start;padding-top:2px;">
+          <button class="btn-acao btn-config" style="white-space:nowrap;" onclick="abrirConfigEmpresa('${eId}')">⚙ Config</button>
         </div>`;
       lista.appendChild(card);
     });
