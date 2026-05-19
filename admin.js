@@ -228,20 +228,22 @@ window.gerarCodigo = async function() {
 function criarCard(c, docId) {
   const card = document.createElement("div");
   card.className = "card";
+  card.style.cssText = "display:flex;align-items:center;gap:12px;flex-wrap:wrap;";
   // 🔒 sanitize evita XSS em dados do Firestore
   const sNome   = sanitize(c.nome);
   const sStatus = sanitize(c.status);
-  const sId     = sanitize(c.id || docId);
+  // UID do documento = código (ex: MA-123456) — docId é sempre a fonte correta
+  const sId     = sanitize(docId || c.id || "");
   const sDocId  = sanitize(docId);
   const sFoto   = sanitize(c.foto || "");
   card.innerHTML = `
-    <img src="${sFoto || "https://via.placeholder.com/80"}">
-    <div class="info">
-      <h3>${sNome}</h3>
-      <p class="status ${sStatus}">${sStatus}</p>
-      <p>${sId}</p>
+    <img src="${sFoto || "https://via.placeholder.com/80"}" style="width:56px;height:56px;border-radius:8px;object-fit:cover;flex-shrink:0;">
+    <div class="info" style="flex:1;min-width:0;">
+      <h3 style="margin:0 0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${sNome}</h3>
+      <p class="status ${sStatus}" style="margin:2px 0;">${sStatus}</p>
+      <p style="margin:2px 0;font-size:12px;color:#aaa;font-family:monospace;">${sId}</p>
     </div>
-    <div class="acao">
+    <div class="acao" style="display:flex;align-items:center;justify-content:flex-end;flex-shrink:0;">
       ${c.status === "ativo"
         ? `<button class="btn-acao btn-inativar" onclick="inativar('${sDocId}')">Inativar</button>`
         : `<button class="btn-acao btn-ativar"   onclick="ativar('${sDocId}')">Ativar</button>`}
@@ -484,6 +486,34 @@ window.salvarConfigEmpresa = async function(eId) {
   }
 
   try {
+    // ✅ FIX 2 & 4: Ao salvar config, registrar usos atuais de cada cliente como
+    // ponto de início — sorteio e premiação só contam usos A PARTIR daqui.
+    // NÃO zera usos, apenas marca o baseline.
+    const snapCli = await getDocs(query(
+      collection(db, "clientesEmpresa"),
+      where("empresa", "==", eId)
+    ));
+
+    const batchUpdates = snapCli.docs.map(cliDoc => {
+      const usosAtuais = Number(cliDoc.data().usos || 0);
+      const upd = {};
+      // Sorteio: marca início se está ativando sorteio
+      if (ativarSorteio) {
+        upd.inicioSorteio = usosAtuais;
+        // Reseta ciclosSorteio para alinhar com novo início
+        upd.ciclosSorteio = 0;
+      }
+      // Brinde: marca início se está ativando brinde
+      if (ativarBrinde) {
+        upd.inicioPremiacao = usosAtuais;
+        // Reseta ciclosBrinde para alinhar com novo início
+        upd.ciclosBrinde = 0;
+      }
+      if (Object.keys(upd).length === 0) return Promise.resolve();
+      return updateDoc(doc(db, "clientesEmpresa", cliDoc.id), upd);
+    });
+    await Promise.all(batchUpdates);
+
     await setDoc(doc(db, "empresas", eId), {
       ativarBrinde,
       metaBrinde,
@@ -523,7 +553,7 @@ window.verPremiacoes = async function() {
     // ── Botão histórico completo
     const btnHist = document.createElement("button");
     btnHist.className = "btn-historico-topo";
-    btnHist.textContent = "⋯  Histórico de premiações";
+    btnHist.textContent = "Histórico de premiações";
     btnHist.onclick = () => verHistoricoPromocoes("premiacao");
     lista.appendChild(btnHist);
 
@@ -550,14 +580,17 @@ window.verPremiacoes = async function() {
     lista.appendChild(tPend);
 
     // Filtra clientes com brindes pendentes usando ciclosBrinde
+    // ✅ FIX 4: conta apenas usos APÓS inicioPremiacao (salvo ao configurar)
     const pendentes = snapClientes.docs
       .map(d => ({ docId: d.id, ...d.data() }))
       .filter(d => {
         const meta = metaMap[d.empresa];
         if (!meta || meta <= 0) return false;
-        const usos         = Number(d.usos || 0);
-        const ciclosBrinde = Number(d.ciclosBrinde || 0);
-        return Math.floor(usos / meta) > ciclosBrinde;
+        const usos           = Number(d.usos || 0);
+        const inicioPremiacao = Number(d.inicioPremiacao ?? 0);
+        const usosDesdeInicio = Math.max(0, usos - inicioPremiacao);
+        const ciclosBrinde   = Number(d.ciclosBrinde || 0);
+        return Math.floor(usosDesdeInicio / meta) > ciclosBrinde;
       });
 
     if (!pendentes.length) {
@@ -572,10 +605,12 @@ window.verPremiacoes = async function() {
     tPend.textContent = ` Clientes com brinde pendente (${pendentes.length} cliente${pendentes.length > 1 ? "s" : ""})`;
 
     renderPaginado(lista, pendentes, d => {
-      const meta         = metaMap[d.empresa] || 1;
-      const usos         = Number(d.usos || 0);
-      const ciclosBrinde = Number(d.ciclosBrinde || 0);
-      const brindesPend  = Math.floor(usos / meta) - ciclosBrinde;
+      const meta            = metaMap[d.empresa] || 1;
+      const usos            = Number(d.usos || 0);
+      const inicioPremiacao = Number(d.inicioPremiacao ?? 0);
+      const usosDesdeInicio = Math.max(0, usos - inicioPremiacao);
+      const ciclosBrinde    = Number(d.ciclosBrinde || 0);
+      const brindesPend     = Math.floor(usosDesdeInicio / meta) - ciclosBrinde;
 
       const card = document.createElement("div");
       card.className = "card card-premiacao";
@@ -671,14 +706,16 @@ window.confirmarPremiacao = async function(docId, eId, clienteId, nomeEmpresa, n
   if (!confirm(`Confirmar premiação para ${nomeCliente}?`)) return;
   const { data, hora } = agora();
   try {
-    // Busca dados atuais do cliente para calcular o novo ciclosBrinde
+    // ✅ FIX 4: Calcula novoCiclo com base nos usos APÓS inicioPremiacao
     const cliSnap  = await getDoc(doc(db, "clientesEmpresa", docId));
     const cliData  = cliSnap.exists() ? cliSnap.data() : {};
     const empSnap  = await getDoc(doc(db, "empresas", eId));
-    const meta     = Number(empSnap.exists() ? empSnap.data().metaBrinde : 0) || 1;
-    const usos     = Number(cliData.usos || 0);
-    // Avança ciclosBrinde para o ciclo atual — próxima premiação só após mais +meta compras
-    const novoCiclo = Math.floor(usos / meta);
+    const meta            = Number(empSnap.exists() ? empSnap.data().metaBrinde : 0) || 1;
+    const usos            = Number(cliData.usos || 0);
+    const inicioPremiacao = Number(cliData.inicioPremiacao ?? 0);
+    const usosDesdeInicio = Math.max(0, usos - inicioPremiacao);
+    // Avança ciclosBrinde contado desde inicioPremiacao
+    const novoCiclo = Math.floor(usosDesdeInicio / meta);
 
     await updateDoc(doc(db, "clientesEmpresa", docId), {
       ciclosBrinde: novoCiclo,
@@ -708,7 +745,7 @@ window.verSorteios = async function() {
     // ── Botão histórico completo
     const btnHist = document.createElement("button");
     btnHist.className = "btn-historico-topo";
-    btnHist.textContent = "⋯  Histórico de sorteios";
+    btnHist.textContent = "Histórico de sorteios";
     btnHist.onclick = () => verHistoricoPromocoes("sorteio");
     lista.appendChild(btnHist);
 
@@ -743,10 +780,13 @@ window.verSorteios = async function() {
         collection(db, "clientesEmpresa"),
         where("empresa", "==", eId)
       ));
+      // ✅ FIX 2: conta usos APENAS após inicioSorteio (salvo ao configurar)
       const total  = snapCli.docs.filter(d => {
-        const usos  = Number(d.data().usos || 0);
-        const ciclo = Number(d.data().ciclosSorteio || 0);
-        return Math.floor(usos / metaCompras) > ciclo;
+        const usos          = Number(d.data().usos || 0);
+        const inicioSorteio = Number(d.data().inicioSorteio ?? 0);
+        const usosDesde     = Math.max(0, usos - inicioSorteio);
+        const ciclo         = Number(d.data().ciclosSorteio || 0);
+        return Math.floor(usosDesde / metaCompras) > ciclo;
       }).length;
       const pronto = total >= metaClientes;
 
@@ -800,12 +840,15 @@ window.verParticipantesSorteio = async function(eId, nomeEmpresa, metaCompras) {
       collection(db, "clientesEmpresa"),
       where("empresa", "==", eId)
     ));
+    // ✅ FIX 2: elegível apenas por usos após inicioSorteio
     const elegiveis = snap.docs
       .map(d => d.data())
       .filter(d => {
-        const usos  = Number(d.usos || 0);
-        const ciclo = Number(d.ciclosSorteio || 0);
-        return Math.floor(usos / metaCompras) > ciclo;
+        const usos          = Number(d.usos || 0);
+        const inicioSorteio = Number(d.inicioSorteio ?? 0);
+        const usosDesde     = Math.max(0, usos - inicioSorteio);
+        const ciclo         = Number(d.ciclosSorteio || 0);
+        return Math.floor(usosDesde / metaCompras) > ciclo;
       });
 
     lista.innerHTML = "";
@@ -831,14 +874,17 @@ window.verParticipantesSorteio = async function(eId, nomeEmpresa, metaCompras) {
     renderPaginado(lista, elegiveis, (d) => {
       const card = document.createElement("div");
       card.className = "card";
-      const _usos  = Number(d.usos || 0);
-      const _ciclo = Number(d.ciclosSorteio || 0);
-      const _participacoes = Math.floor(_usos / metaCompras) - _ciclo;
+      const _usos         = Number(d.usos || 0);
+      const _inicio       = Number(d.inicioSorteio ?? 0);
+      const _usosDesde    = Math.max(0, _usos - _inicio);
+      const _ciclo        = Number(d.ciclosSorteio || 0);
+      const _participacoes = Math.floor(_usosDesde / metaCompras) - _ciclo;
       card.innerHTML = `
         <div class="info">
           <h3>${sanitize(d.nome || d.clienteId)}</h3>
           <p><strong>ID:</strong> ${sanitize(d.clienteId)}</p>
           <p><strong>Compras totais:</strong> ${_usos}</p>
+          <p><strong>Compras desde configuração:</strong> ${_usosDesde}</p>
           <p><strong>Participações disponíveis:</strong> ${_participacoes}</p>
           <span class="tag-ativo">✦ Elegível</span>
         </div>`;
@@ -855,13 +901,15 @@ window.realizarSorteio = async function(eId, nomeEmpresa, qtdGanhadores, metaCom
       collection(db, "clientesEmpresa"),
       where("empresa", "==", eId)
     ));
+    // ✅ FIX 2: elegível apenas por usos APÓS inicioSorteio
     const elegiveis = snap.docs
       .map(d => ({ id: d.id, data: d.data() }))
       .filter(e => {
-        const usos  = Number(e.data.usos || 0);
-        const ciclo = Number(e.data.ciclosSorteio || 0);
-        // elegível se já completou mais ciclos do que já participou
-        return Math.floor(usos / metaCompras) > ciclo;
+        const usos          = Number(e.data.usos || 0);
+        const inicioSorteio = Number(e.data.inicioSorteio ?? 0);
+        const usosDesde     = Math.max(0, usos - inicioSorteio);
+        const ciclo         = Number(e.data.ciclosSorteio || 0);
+        return Math.floor(usosDesde / metaCompras) > ciclo;
       });
 
     if (!elegiveis.length) { alert("Nenhum cliente elegível ❗"); return; }
@@ -874,13 +922,19 @@ window.realizarSorteio = async function(eId, nomeEmpresa, qtdGanhadores, metaCom
 
     const { data, hora } = agora();
 
-    // Não zera usos — registra até qual ciclo o cliente já participou.
-    // ciclosSorteio = Math.floor(usos / meta) → próximo sorteio só quando usos
-    // avançar para o ciclo seguinte (ou seja, comprar mais X vezes).
+    // ✅ FIX 2: Não zera usos — avança ciclosSorteio com base nos usos desde inicioSorteio.
+    // ✅ FIX 3: Atualiza TODOS os elegíveis (não só ganhadores) para remover o aviso
+    //           "Realizar sorteio" de todos os painéis (ADM principal e ADM empresa).
     await Promise.all(
-      elegiveis.map(e => updateDoc(doc(db, "clientesEmpresa", e.id), {
-        ciclosSorteio: Math.floor(Number(e.data.usos || 0) / metaCompras)
-      }))
+      elegiveis.map(e => {
+        const usos          = Number(e.data.usos || 0);
+        const inicioSorteio = Number(e.data.inicioSorteio ?? 0);
+        const usosDesde     = Math.max(0, usos - inicioSorteio);
+        return updateDoc(doc(db, "clientesEmpresa", e.id), {
+          ciclosSorteio:     Math.floor(usosDesde / metaCompras),
+          participouSorteio: true   // ✅ FIX 3: garante compatibilidade com script.js
+        });
+      })
     );
     await addDoc(collection(db, "historicoPromocoes"), {
       tipo: "sorteio", empresa: eId, nomeEmpresa,

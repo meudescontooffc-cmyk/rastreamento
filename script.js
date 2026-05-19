@@ -659,8 +659,11 @@ async function carregarUltimasValidacoes() {
   try {
 
     const metaBrinde = Number(empresaConfig?.metaBrinde || 10);
-    const metaSorteio = Number(empresaConfig?.metaSorteio || 10);
-    const qtdSorteio = Number(empresaConfig?.qtdSorteio || 5);
+    const metaClientesSorteio = Number(
+      empresaConfig?.metaClientesSorteio ||
+      empresaConfig?.metaSorteio || 5
+    );
+    const qtdSorteio = Number(empresaConfig?.qtdSorteio || 1);
 
     const ativarBrinde = empresaConfig?.ativarBrinde !== false;
     const ativarSorteio = empresaConfig?.ativarSorteio === true;
@@ -689,15 +692,25 @@ async function carregarUltimasValidacoes() {
       const d = docu.data();
 
       const usos = Number(d.usos || 0);
-      // Lógica acumulativa: ciclosBrinde marca quantas premiações já foram entregues
-      // A cada +metaBrinde compras o cliente ganha mais um brinde
+
+      // ✅ FIX 4: Brinde conta apenas usos APÓS inicioPremiacao
+      const inicioPremiacao = Number(d.inicioPremiacao ?? 0);
+      const usosParaBrinde  = Math.max(0, usos - inicioPremiacao);
       const ciclosBrinde    = Number(d.ciclosBrinde || 0);
-      const ganhosBrinde    = Math.floor(usos / metaBrinde);
+      const ganhosBrinde    = Math.floor(usosParaBrinde / metaBrinde);
       const pendentesBrinde = ganhosBrinde - ciclosBrinde;
 
-      const aptoSorteio =
-        usos >= metaSorteio &&
-        !d.participouSorteio;
+      // ✅ FIX 3: Sorteio usa ciclosSorteio + inicioSorteio — NÃO usa participouSorteio
+      // Isso garante que após o sorteio ser realizado, o aviso some em TODOS os painéis
+      const metaUsosSorteio = Number(
+        empresaConfig?.metaUsosSorteio ||
+        empresaConfig?.metaComprasSorteio ||
+        empresaConfig?.metaSorteio || 10
+      );
+      const inicioSorteio   = Number(d.inicioSorteio ?? 0);
+      const usosParaSorteio = Math.max(0, usos - inicioSorteio);
+      const ciclosSorteio   = Number(d.ciclosSorteio || 0);
+      const aptoSorteio     = Math.floor(usosParaSorteio / metaUsosSorteio) > ciclosSorteio;
 
       const dados = {
         idDoc: docu.id,
@@ -719,84 +732,78 @@ async function carregarUltimasValidacoes() {
     let html = "";
 
     // =====================================
-    // 🔥 CARD SORTEIO
+    // 🔥 CARD SORTEIO + CLIENTES SORTEIO
     // =====================================
-    if (
-      ativarSorteio &&
-      aptosSorteio.length >= qtdSorteio
-    ) {
+    if (ativarSorteio && aptosSorteio.length > 0) {
 
-      html += `
-        <div class="card-beneficio" style="
-          background:#b88b00;
-          border:1px solid rgba(201,169,77,.15);
-          padding:18px;
-        ">
-          <strong style="
-            color:#000;
-            font-size:17px;
-            font-weight:700;
-            display:block;
-            margin-bottom:4px;
+      const metaAtingida = aptosSorteio.length >= metaClientesSorteio;
+
+      // ✅ Só mostra "Realizar sorteio" quando a meta de clientes foi atingida
+      if (metaAtingida) {
+  html += `
+    <div class="card-beneficio" style="
+      background:#b88b00;
+      border:1px solid rgba(201,169,77,.15);
+      padding:18px;
+      margin-bottom:8px;
+    ">
+      <strong style="
+        color:#000;
+        font-size:17px;
+        font-weight:700;
+        display:block;
+        margin-bottom:4px;
+      ">
+        Realizar sorteio
+      </strong>
+
+      <span style="
+        color:#000;
+        font-size:13px;
+      ">
+        Clientes atingiram os requisitos para participar
+      </span>
+
+    </div>
+  `;
+}
+      
+
+      // Lista todos os clientes já aptos, independente da meta
+      aptosSorteio.forEach((d) => {
+        html += `
+          <div class="item-historico" style="
+            border:1px solid rgba(201,169,77,.15);
+            background:#101010;
           ">
-            Realizar sorteio
-          </strong>
-
-          <span style="
-            color:#000;
-            font-size:13px;
-          ">
-            Clientes já atingiram os requisitos para participar
-          </span>
-        </div>
-      `;
-    }
-
-    // =====================================
-    // 🔥 CLIENTES SORTEIO
-    // =====================================
-    aptosSorteio.forEach((d) => {
-
-      html += `
-        <div class="item-historico" style="
-          border:1px solid rgba(201,169,77,.15);
-          background:#101010;
-        ">
-
-          <div class="dados-historico">
-
-            <div style="
-              color:#ffd700;
-              font-size:12px;
-              margin-bottom:6px;
-              font-weight:bold;
-            ">
-              Cliente apto para sorteio
+            <div class="dados-historico">
+              <div style="
+                color:#ffd700;
+                font-size:12px;
+                margin-bottom:6px;
+                font-weight:bold;
+              ">
+                Cliente apto para sorteio
+              </div>
+              <div class="topo-historico">
+                <strong style="color:#fff;font-size:16px;">
+                  ${d.nome || d.clienteId}
+                </strong>
+                <button
+                  class="btn-detalhes"
+                  onclick="verDetalhes('${d.clienteId}')">
+                  Ver detalhes
+                </button>
+              </div>
+              <span>ID: ${d.clienteId || "---"}</span>
+              <span>Total: ${moeda(d.totalGasto || 0)}</span>
+              <span>Usos: ${d.usos || 0}</span>
+              <span>${d.ultimaData || "--"} ${d.ultimaHora || "--"}</span>
             </div>
-
-            <div class="topo-historico">
-
-              <strong style="color:#fff;font-size:16px;">
-                ${d.nome || d.clienteId}
-              </strong>
-
-              <button
-                class="btn-detalhes"
-                onclick="verDetalhes('${d.clienteId}')">
-                Ver detalhes
-              </button>
-
-            </div>
-
-            <span>ID: ${d.clienteId || "---"}</span>
-            <span>Total: ${moeda(d.totalGasto || 0)}</span>
-            <span>Usos: ${d.usos || 0}</span>
-            <span>${d.ultimaData || "--"} ${d.ultimaHora || "--"}</span>
-
           </div>
-        </div>
-      `;
-    });
+        `;
+      });
+    }
 
     // =====================================
     // 🔥 CLIENTES BRINDE
@@ -1262,10 +1269,9 @@ empresaNome:
 
       };
 
-      // 🔥 PARTICIPA DO SORTEIO
-      if (usosAtual >= 3) {
-        atualizar.aptoSorteio = true;
-      }
+      // ✅ FIX 3: aptoSorteio não é mais usado para elegibilidade;
+      // a elegibilidade agora é calculada via ciclosSorteio + inicioSorteio.
+      // Mantemos o campo apenas para retrocompatibilidade, sem alterar sua lógica.
 
       await updateDoc(
         doc(
@@ -1327,14 +1333,20 @@ empresaNome:
 
     }
 
-    // 🔥 ALERTA SORTEIO
-    const metaSorteio =
-      Number(empresaConfig?.metaSorteio || 10);
+    // 🔥 ALERTA SORTEIO — usa metaUsosSorteio (nome correto do campo)
+    const metaUsosSorteioAlerta =
+      Number(empresaConfig?.metaUsosSorteio ||
+             empresaConfig?.metaComprasSorteio ||
+             empresaConfig?.metaSorteio || 10);
 
-    if (usosAtual === metaSorteio) {
+    // Calcula usos desde inicioSorteio para o alerta também ser consistente
+    const inicioSorteioAlerta = Number(dadosEmpresaCliente?.inicioSorteio ?? 0);
+    const usosDesdeInicioAlerta = Math.max(0, usosAtual - inicioSorteioAlerta);
+
+    if (usosDesdeInicioAlerta === metaUsosSorteioAlerta) {
 
       mostrarMensagem(
-        `${clienteAtual.nome || "Cliente"} atingiu ${metaSorteio} compras e entrou no sorteio!`
+        `${clienteAtual.nome || "Cliente"} atingiu ${metaUsosSorteioAlerta} compras e entrou no sorteio!`
       );
 
     }
@@ -1540,13 +1552,16 @@ window.premiarCliente = async (event, idDoc) => {
 
   try {
 
-    // Busca dados atuais para calcular o novo ciclosBrinde
+    // ✅ FIX 4: Calcula novoCiclo com base nos usos APÓS inicioPremiacao
     const ref     = doc(db, "clientesEmpresa", idDoc);
     const cliSnap = await getDoc(ref);
     const cliData = cliSnap.exists() ? cliSnap.data() : {};
-    const meta    = Number(empresaConfig?.metaBrinde || 10);
-    const usos    = Number(cliData.usos || 0);
-    const novoCiclo = Math.floor(usos / meta);
+    const meta            = Number(empresaConfig?.metaBrinde || 10);
+    const usos            = Number(cliData.usos || 0);
+    const inicioPremiacao = Number(cliData.inicioPremiacao ?? 0);
+    const usosDesdeInicio = Math.max(0, usos - inicioPremiacao);
+    // ciclosBrinde avança para o ciclo atual contado desde o início da config
+    const novoCiclo = Math.floor(usosDesdeInicio / meta);
 
     const agora = new Date();
     const dataStr = agora.toLocaleDateString("pt-BR");
