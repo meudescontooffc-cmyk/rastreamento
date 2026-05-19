@@ -5,6 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ADM</title>
   <link rel="stylesheet" href="admin.css">
+  <style>
+    /* Botão ativo do menu — dourado persistente */
+    .btn-menu.active {
+      background: #FFD700 !important;
+      color: #111 !important;
+      border-color: #FFD700 !important;
+      box-shadow: 0 0 8px rgba(255, 215, 0, 0.5);
+    }
+  </style>
 </head>
 <body>
 
@@ -33,7 +42,7 @@
     <input id="c6" maxlength="1" inputmode="numeric">
   </div>
 
-  <button class="btn" onclick="buscar()">Procurar usuário</button>
+  <button class="btn" id="btn-buscar" onclick="buscar('btn-buscar')">Procurar usuário</button>
 
   <div class="linha"></div>
 
@@ -42,14 +51,14 @@
   ===================================== -->
   <div class="menu-scroll">
 
-    <button class="btn-menu" onclick="verAtivos()">Ativos</button>
-    <button class="btn-menu" onclick="verInativos()">Inativos</button>
-    <button class="btn-menu" onclick="verValidacoes()">Validações</button>
-    <button class="btn-menu btn-menu-empresas" onclick="verEmpresas()">Empresas</button>
-    <button class="btn-menu btn-menu-premiacoes" onclick="verPremiacoes()"> Premiações</button>
-    <button class="btn-menu btn-menu-sorteios" onclick="verSorteios()"> Sorteios</button>
-    <button class="btn-menu" onclick="gerarCodigo()">Gerar Código</button>
-    <button class="btn-menu" onclick="listarClientes()">Todos</button>
+    <button class="btn-menu" id="btn-ativos"      onclick="verAtivos('btn-ativos')">Ativos</button>
+    <button class="btn-menu" id="btn-inativos"    onclick="verInativos('btn-inativos')">Inativos</button>
+    <button class="btn-menu" id="btn-validacoes"  onclick="verValidacoes('btn-validacoes')">Validações</button>
+    <button class="btn-menu btn-menu-empresas"    id="btn-empresas"    onclick="verEmpresas('btn-empresas')">Empresas</button>
+    <button class="btn-menu btn-menu-premiacoes"  id="btn-premiacoes"  onclick="verPremiacoes('btn-premiacoes')"> Premiações</button>
+    <button class="btn-menu btn-menu-sorteios"    id="btn-sorteios"    onclick="verSorteios('btn-sorteios')"> Sorteios</button>
+    <button class="btn-menu" id="btn-gerar"       onclick="gerarCodigo()">Gerar Código</button>
+    <button class="btn-menu" id="btn-todos"       onclick="listarClientes('btn-todos')">Todos</button>
 
   </div>
 

@@ -97,6 +97,47 @@ const PAGE = 15;
 
 
 /* =========================================
+   🔀 CONTROLE DE VIEW ATIVA
+   Evita que respostas async de uma aba
+   sobrescrevam o conteúdo de outra aba.
+========================================= */
+
+let _viewToken = 0; // incrementa a cada troca de view
+
+function novaView() {
+  _viewToken++;
+  return _viewToken; // cada chamada guarda seu próprio token
+}
+
+// Retorna true se o token ainda é a view ativa
+function viewAtiva(token) {
+  return token === _viewToken;
+}
+
+// Marca o botão do menu como ativo (dourado) e persiste no sessionStorage
+function setActiveBtn(btnId) {
+  // Remove classe de todos os botões de nav
+  document.querySelectorAll(".btn-menu, .btn").forEach(b => b.classList.remove("active"));
+  // Adiciona no botão atual
+  const btn = document.getElementById(btnId);
+  if (btn) btn.classList.add("active");
+  // Persiste para sobreviver a re-renders
+  try { sessionStorage.setItem("adminActiveBtn", btnId); } catch (_) {}
+}
+
+// Restaura o botão ativo ao carregar / após qualquer re-render
+function restaurarBtnAtivo() {
+  try {
+    const id = sessionStorage.getItem("adminActiveBtn");
+    if (!id) return;
+    document.querySelectorAll(".btn-menu, .btn").forEach(b => b.classList.remove("active"));
+    const btn = document.getElementById(id);
+    if (btn) btn.classList.add("active");
+  } catch (_) {}
+}
+
+
+/* =========================================
    💾 CACHE (TTL 60s)
 ========================================= */
 
@@ -271,27 +312,39 @@ async function carregarClientes() {
    🔥 LISTAR / ATIVOS / INATIVOS / TODOS
 ========================================= */
 
-window.listarClientes = async function() {
+window.listarClientes = async function(btnId) {
+  if (btnId) setActiveBtn(btnId);
+  const token = novaView();
   lista.innerHTML = "Carregando...";
   const todos = await carregarClientes();
+  if (!viewAtiva(token)) return;
   lista.innerHTML = "";
   paginar(todos, ({ data, id }) => criarCard(data, id));
+  restaurarBtnAtivo();
 };
 
-window.verAtivos = async function() {
+window.verAtivos = async function(btnId) {
+  if (btnId) setActiveBtn(btnId);
+  const token = novaView();
   lista.innerHTML = "Carregando...";
   const todos   = await carregarClientes();
+  if (!viewAtiva(token)) return;
   const filtro  = todos.filter(c => c.data.status === "ativo");
   lista.innerHTML = "";
   paginar(filtro, ({ data, id }) => criarCard(data, id));
+  restaurarBtnAtivo();
 };
 
-window.verInativos = async function() {
+window.verInativos = async function(btnId) {
+  if (btnId) setActiveBtn(btnId);
+  const token = novaView();
   lista.innerHTML = "Carregando...";
   const todos   = await carregarClientes();
+  if (!viewAtiva(token)) return;
   const filtro  = todos.filter(c => c.data.status === "inativo");
   lista.innerHTML = "";
   paginar(filtro, ({ data, id }) => criarCard(data, id));
+  restaurarBtnAtivo();
 };
 
 window.ativar = async function(docId) {
@@ -318,12 +371,15 @@ function pegarCodigo() {
   return estadoSelect.value.trim().toUpperCase() + "-" + numeros.map(n => n.value).join("");
 }
 
-window.buscar = async function() {
+window.buscar = async function(btnId) {
+  if (btnId) setActiveBtn(btnId);
+  const token = novaView();
   const codigo = pegarCodigo();
   lista.innerHTML = "Buscando...";
 
   // Busca direta pelo UID — sem varrer coleção inteira
   const snap = await getDoc(doc(db, "clientes", codigo));
+  if (!viewAtiva(token)) return;
   lista.innerHTML = "";
 
   if (snap.exists()) {
@@ -331,6 +387,7 @@ window.buscar = async function() {
   } else {
     lista.innerHTML = "Usuário não encontrado ❌";
   }
+  restaurarBtnAtivo();
 };
 
 
@@ -338,7 +395,9 @@ window.buscar = async function() {
    🏢 EMPRESAS
 ========================================= */
 
-window.verEmpresas = async function() {
+window.verEmpresas = async function(btnId) {
+  if (btnId) setActiveBtn(btnId);
+  const token = novaView();
   lista.innerHTML = "Carregando empresas...";
   fecharPainelConfig();
 
@@ -349,6 +408,7 @@ window.verEmpresas = async function() {
       empresas = snap.docs.map(d => ({ data: d.data(), id: d.id }));
       cache.set("empresas", empresas);
     }
+    if (!viewAtiva(token)) return;
 
     lista.innerHTML = "";
 
@@ -384,6 +444,7 @@ window.verEmpresas = async function() {
     });
 
   } catch (e) { console.error(e); lista.innerHTML = "Erro ao carregar ❌"; }
+  restaurarBtnAtivo();
 };
 
 
@@ -549,11 +610,14 @@ window.salvarConfigEmpresa = async function(eId) {
    🏆 PREMIAÇÕES
 ========================================= */
 
-window.verPremiacoes = async function() {
+window.verPremiacoes = async function(btnId) {
+  if (btnId) setActiveBtn(btnId);
+  const token = novaView();
   lista.innerHTML = "Carregando premiações...";
   fecharPainelConfig();
 
   try {
+    if (!viewAtiva(token)) return;
     lista.innerHTML = "";
 
     // ── Botão histórico completo
@@ -568,6 +632,7 @@ window.verPremiacoes = async function() {
       getDocs(collection(db, "clientesEmpresa")),
       getDocs(collection(db, "empresas"))
     ]);
+    if (!viewAtiva(token)) return;
 
     // Mapa empresaId → metaBrinde
     const metaMap = {};
@@ -649,6 +714,7 @@ window.verPremiacoes = async function() {
     });
 
   } catch (e) { console.error(e); lista.innerHTML = "Erro ao carregar ❌"; }
+  restaurarBtnAtivo();
 };
 
 window.verParticipantesPremiacao = async function(eId, nomeEmpresa) {
@@ -741,11 +807,14 @@ window.confirmarPremiacao = async function(docId, eId, clienteId, nomeEmpresa, n
    🎰 SORTEIOS
 ========================================= */
 
-window.verSorteios = async function() {
+window.verSorteios = async function(btnId) {
+  if (btnId) setActiveBtn(btnId);
+  const token = novaView();
   lista.innerHTML = "Carregando sorteios...";
   fecharPainelConfig();
 
   try {
+    if (!viewAtiva(token)) return;
     lista.innerHTML = "";
 
     // ── Botão histórico completo
@@ -757,6 +826,7 @@ window.verSorteios = async function() {
 
     // ── Busca apenas empresas com sorteio ativo
     const snapEmpresas = await getDocs(query(collection(db, "empresas"), where("ativarSorteio", "==", true)));
+    if (!viewAtiva(token)) return;
 
     if (snapEmpresas.empty) {
       const p = document.createElement("p");
@@ -786,6 +856,7 @@ window.verSorteios = async function() {
         collection(db, "clientesEmpresa"),
         where("empresa", "==", eId)
       ));
+      if (!viewAtiva(token)) return;
       // ✅ FIX 2: conta usos APENAS após inicioSorteio (salvo ao configurar)
       const total  = snapCli.docs.filter(d => {
         const usos          = Number(d.data().usos || 0);
@@ -837,6 +908,7 @@ window.verSorteios = async function() {
     });
 
   } catch (e) { console.error(e); lista.innerHTML = "Erro ao carregar ❌"; }
+  restaurarBtnAtivo();
 };
 
 window.verParticipantesSorteio = async function(eId, nomeEmpresa, metaCompras) {
@@ -1023,7 +1095,9 @@ window.verHistoricoPromocoes = async function(tipo) {
   } catch (e) { console.error("Histórico erro:", e); lista.innerHTML = "Erro ao carregar ❌ — verifique o console."; }
 };
 
-window.verValidacoes = async function() {
+window.verValidacoes = async function(btnId) {
+  if (btnId) setActiveBtn(btnId);
+  const token = novaView();
   lista.innerHTML = "Carregando...";
   fecharPainelConfig();
 
@@ -1031,6 +1105,7 @@ window.verValidacoes = async function() {
     const snap = await getDocs(
       query(collection(db, "clientesEmpresa"), orderBy("ultimaValidacao", "desc"))
     );
+    if (!viewAtiva(token)) return;
 
     if (snap.empty) { lista.innerHTML = "Nenhuma validação encontrada ❗"; return; }
 
@@ -1078,6 +1153,7 @@ window.verValidacoes = async function() {
     });
 
   } catch (e) { console.error(e); lista.innerHTML = "Erro ao carregar ❌"; }
+  restaurarBtnAtivo();
 };
 
 
@@ -1190,3 +1266,6 @@ window.verDetalhesCliente = async function(eId, clienteId) {
 
   } catch (e) { console.error(e); lista.innerHTML = "Erro ao carregar ❌"; }
 };
+
+// Restaura o botão ativo ao carregar a página
+document.addEventListener("DOMContentLoaded", restaurarBtnAtivo);
