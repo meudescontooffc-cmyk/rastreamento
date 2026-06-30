@@ -270,6 +270,65 @@ async function buscarDadosEmpresaCliente(clienteId) {
 }
 
 
+// 📅 CONTAGEM AUTOMÁTICA DE DIAS
+// Compara a data de hoje com a última vez que o saldo de dias foi atualizado
+// e desconta os dias corridos que passaram desde então. Funciona mesmo que
+// ninguém abra o sistema por vários dias seguidos (desconta tudo de uma vez).
+// Persiste a correção no Firestore para a contagem nunca se perder.
+function diasCorridosDesde(dataISO) {
+  if (!dataISO) return 0;
+  const hoje = new Date();
+  const hojeUTC = Date.UTC(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+
+  const [ano, mes, dia] = dataISO.split("-").map(Number);
+  const dataUTC = Date.UTC(ano, mes - 1, dia);
+
+  return Math.floor((hojeUTC - dataUTC) / 86400000);
+}
+
+function dataDeHojeISO() {
+  const hoje = new Date();
+  const ano = hoje.getFullYear();
+  const mes = String(hoje.getMonth() + 1).padStart(2, "0");
+  const dia = String(hoje.getDate()).padStart(2, "0");
+  return `${ano}-${mes}-${dia}`;
+}
+
+async function aplicarContagemDeDias(docId, dadosCliente) {
+  // Cliente sem nenhum dia configurado (ex: plano "Pendente" nunca ativado) — não desconta nada.
+  if (dadosCliente.diasRestantes === undefined || dadosCliente.diasRestantes === null) {
+    return dadosCliente;
+  }
+
+  const hojeISO = dataDeHojeISO();
+  const ultimaAtualizacao = dadosCliente.ultimaAtualizacaoDias || hojeISO;
+  const diasPassados = diasCorridosDesde(ultimaAtualizacao);
+
+  // Já foi atualizado hoje, nada a fazer.
+  if (diasPassados <= 0) {
+    if (!dadosCliente.ultimaAtualizacaoDias) {
+      // Primeira vez que esse campo é gravado — só marca a referência, sem descontar.
+      try { await updateDoc(doc(db, "clientes", docId), { ultimaAtualizacaoDias: hojeISO }); } catch (_) {}
+    }
+    return dadosCliente;
+  }
+
+  const diasAtuais = Number(dadosCliente.diasRestantes || 0);
+  const novosDias = diasAtuais - diasPassados;
+  const novoStatus = novosDias <= 0 ? "inativo" : dadosCliente.status;
+
+  try {
+    await updateDoc(doc(db, "clientes", docId), {
+      diasRestantes: novosDias,
+      ultimaAtualizacaoDias: hojeISO,
+      status: novoStatus
+    });
+  } catch (_) { /* se falhar, segue com o valor antigo em memória mesmo assim */ }
+
+  return { ...dadosCliente, diasRestantes: novosDias, ultimaAtualizacaoDias: hojeISO, status: novoStatus };
+}
+
+
 // 🔍 BUSCAR CLIENTE
 window.buscar = async () => {
 
@@ -319,6 +378,9 @@ window.buscar = async () => {
   "https://via.placeholder.com/100";
 
     clienteAtual = snap.data();
+
+    // 📅 Desconta os dias corridos desde a última verificação, se houver.
+    clienteAtual = await aplicarContagemDeDias(codigo, clienteAtual);
 
     if (buscaAtual !== tokenBusca) {
       buscandoAgora = false;
@@ -684,6 +746,7 @@ async function carregarUltimasValidacoes() {
 
     const aptosBrinde = [];
     const aptosSorteio = [];
+    const aptosAmbos = [];
     const normais = [];
 
     // 🔥 SEPARAÇÃO
@@ -718,9 +781,17 @@ async function carregarUltimasValidacoes() {
         pendentesBrinde
       };
 
-      if (ativarSorteio && aptoSorteio) {
+      const ehAptoSorteio = ativarSorteio && aptoSorteio;
+      const ehAptoBrinde  = ativarBrinde && pendentesBrinde > 0;
+
+      // ✅ Quando os dois módulos estão ativos e o cliente bate as duas metas
+      // ao mesmo tempo, ele entra no grupo combinado (mensagem única),
+      // sem perder a participação em nenhuma das duas listas/ações.
+      if (ehAptoSorteio && ehAptoBrinde) {
+        aptosAmbos.push(dados);
+      } else if (ehAptoSorteio) {
         aptosSorteio.push(dados);
-      } else if (ativarBrinde && pendentesBrinde > 0) {
+      } else if (ehAptoBrinde) {
         aptosBrinde.push(dados);
       } else {
         normais.push(dados);
@@ -732,11 +803,12 @@ async function carregarUltimasValidacoes() {
     let html = "";
 
     // =====================================
-    // 🔥 CARD SORTEIO + CLIENTES SORTEIO
+    // 🔥 CARD SORTEIO (meta de clientes considera sorteio + ambos)
     // =====================================
-    if (ativarSorteio && aptosSorteio.length > 0) {
+    const totalAptosSorteio = aptosSorteio.length + aptosAmbos.length;
+    if (ativarSorteio && totalAptosSorteio > 0) {
 
-      const metaAtingida = aptosSorteio.length >= metaClientesSorteio;
+      const metaAtingida = totalAptosSorteio >= metaClientesSorteio;
 
       // ✅ Só mostra "Realizar sorteio" quando a meta de clientes foi atingida
       if (metaAtingida) {
@@ -769,7 +841,7 @@ async function carregarUltimasValidacoes() {
 }
       
 
-      // Lista todos os clientes já aptos, independente da meta
+      // Lista todos os clientes já aptos só pro sorteio, independente da meta
       aptosSorteio.forEach((d) => {
         html += `
           <div class="item-historico" style="
@@ -789,11 +861,18 @@ async function carregarUltimasValidacoes() {
                 <strong style="color:#fff;font-size:16px;">
                   ${d.nome || d.clienteId}
                 </strong>
-                <button
-                  class="btn-detalhes"
-                  onclick="verDetalhes('${d.clienteId}')">
-                  Ver detalhes
-                </button>
+                <div class="acoes-historico">
+                  <button
+                    class="btn-detalhes"
+                    onclick="verDetalhes('${d.clienteId}')">
+                    Ver histórico
+                  </button>
+                  <button
+                    class="btn-detalhes"
+                    onclick="verDetalhesCliente('${d.clienteId}')">
+                    Ver detalhes
+                  </button>
+                </div>
               </div>
               <span>ID: ${d.clienteId || "---"}</span>
               <span>Total: ${moeda(d.totalGasto || 0)}</span>
@@ -804,6 +883,86 @@ async function carregarUltimasValidacoes() {
         `;
       });
     }
+
+    // =====================================
+    // 🔥 CLIENTES APTOS PARA SORTEIO E PREMIAÇÃO (ambos ao mesmo tempo)
+    // =====================================
+    aptosAmbos.forEach((d) => {
+
+      html += `
+        <div class="item-historico" style="
+          border:1px solid rgba(255,215,0,.25);
+          background:linear-gradient(135deg,#171717,#0f0f0f);
+        ">
+
+          <div class="dados-historico">
+
+            <div style="
+              color:#ffd700;
+              font-size:13px;
+              margin-bottom:8px;
+              font-weight:bold;
+            ">
+              Cliente apto para sorteio e premiação
+            </div>
+
+            <div class="topo-historico">
+
+              <strong style="color:#fff;font-size:17px;">
+                ${d.nome || d.clienteId}
+              </strong>
+
+              <div class="acoes-historico">
+                <button
+                  class="btn-detalhes"
+                  onclick="verDetalhes('${d.clienteId}')">
+                  Ver histórico
+                </button>
+                <button
+                  class="btn-detalhes"
+                  onclick="verDetalhesCliente('${d.clienteId}')">
+                  Ver detalhes
+                </button>
+              </div>
+
+            </div>
+
+            <span>ID: ${d.clienteId || "---"}</span>
+            <span>Total: ${moeda(d.totalGasto || 0)}</span>
+            <span>Usos: ${d.usos || 0}</span>
+            <span>${d.ultimaData || "--"} ${d.ultimaHora || "--"}</span>
+
+            ${d.pendentesBrinde > 0 ? `
+              <div style="
+                margin-top:-42px;
+                display:flex;
+                justify-content:flex-end;
+              ">
+
+                <button
+                  onclick="premiarCliente(event,'${d.idDoc}')"
+                  style="
+                    background:linear-gradient(135deg,#ffd700,#ffcc00);
+                    color:#111;
+                    border:none;
+                    padding:9px 12px;
+                    border-radius:10px;
+                    font-size:12px;
+                    font-weight:900;
+                    cursor:pointer;
+                    min-width:80px;
+                    transition:0.2s ease;
+                  ">
+                  Premiar
+                </button>
+
+              </div>
+            ` : ""}
+
+          </div>
+        </div>
+      `;
+    });
 
     // =====================================
     // 🔥 CLIENTES BRINDE
@@ -833,11 +992,18 @@ async function carregarUltimasValidacoes() {
                 ${d.nome || d.clienteId}
               </strong>
 
-              <button
-                class="btn-detalhes"
-                onclick="verDetalhes('${d.clienteId}')">
-                Ver detalhes
-              </button>
+              <div class="acoes-historico">
+                <button
+                  class="btn-detalhes"
+                  onclick="verDetalhes('${d.clienteId}')">
+                  Ver histórico
+                </button>
+                <button
+                  class="btn-detalhes"
+                  onclick="verDetalhesCliente('${d.clienteId}')">
+                  Ver detalhes
+                </button>
+              </div>
 
             </div>
 
@@ -894,11 +1060,18 @@ async function carregarUltimasValidacoes() {
                 ${d.nome || d.clienteId}
               </strong>
 
-              <button
-                class="btn-detalhes"
-                onclick="verDetalhes('${d.clienteId}')">
-                Ver detalhes
-              </button>
+              <div class="acoes-historico">
+                <button
+                  class="btn-detalhes"
+                  onclick="verDetalhes('${d.clienteId}')">
+                  Ver histórico
+                </button>
+                <button
+                  class="btn-detalhes"
+                  onclick="verDetalhesCliente('${d.clienteId}')">
+                  Ver detalhes
+                </button>
+              </div>
 
             </div>
 
@@ -1123,6 +1296,68 @@ window.fecharDetalhes = () => {
 
   const modal =
     document.getElementById("modalDetalhes");
+
+  if (!modal) return;
+
+  modal.classList.remove("show");
+  modal.classList.add("hidden");
+
+};
+
+
+// DETALHES PESSOAIS DO CLIENTE (telefone, ID, nome, data de nascimento)
+window.verDetalhesCliente = async (id) => {
+
+  const modal = document.getElementById("modalDetalhesCliente");
+  const box   = document.getElementById("conteudoDetalhesCliente");
+
+  modal.classList.remove("hidden");
+  modal.classList.add("show");
+
+  box.innerHTML = "Carregando...";
+
+  try {
+
+    const snap = await getDoc(doc(db, "clientes", id));
+
+    if (!snap.exists()) {
+      box.innerHTML = "Cliente não encontrado.";
+      return;
+    }
+
+    const c = snap.data();
+
+    box.innerHTML = `
+      <div class="linha-info-cliente">
+        <span class="label-info-cliente">Nome</span>
+        <span class="valor-info-cliente">${c.nome || "--"}</span>
+      </div>
+      <div class="linha-info-cliente">
+        <span class="label-info-cliente">ID</span>
+        <span class="valor-info-cliente">${c.id || id || "--"}</span>
+      </div>
+      <div class="linha-info-cliente">
+        <span class="label-info-cliente">Telefone</span>
+        <span class="valor-info-cliente">${c.telefone || "--"}</span>
+      </div>
+      <div class="linha-info-cliente">
+        <span class="label-info-cliente">Data de nascimento</span>
+        <span class="valor-info-cliente">${c.nascimento || "--"}</span>
+      </div>
+    `;
+
+  } catch (erro) {
+
+    console.error("Erro detalhes cliente:", erro);
+    box.innerHTML = "Erro ao carregar.";
+
+  }
+
+};
+
+window.fecharDetalhesCliente = () => {
+
+  const modal = document.getElementById("modalDetalhesCliente");
 
   if (!modal) return;
 

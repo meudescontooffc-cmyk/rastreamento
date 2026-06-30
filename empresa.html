@@ -183,6 +183,29 @@
 
 </section>
 
+<!-- MODAL DETALHES PESSOAIS DO CLIENTE -->
+<section id="modalDetalhesCliente" class="modal hidden">
+
+  <div class="modal-box">
+
+    <div class="modal-topo">
+
+      <h3>Detalhes do cliente</h3>
+
+      <button class="fechar-modal" onclick="fecharDetalhesCliente()">
+        ✕
+      </button>
+
+    </div>
+
+    <div id="conteudoDetalhesCliente">
+      Nenhum detalhe encontrado
+    </div>
+
+  </div>
+
+</section>
+
 <!-- FEEDBACK -->
 
 
@@ -351,7 +374,18 @@
 
   <div class="sucesso-box">
 
-    <h1>Benefício validado ✅</h1>
+    <div class="sucesso-icone-wrap">
+      <div class="sucesso-anel"></div>
+      <div class="sucesso-icone">
+        <svg viewBox="0 0 24 24" width="34" height="34" fill="none">
+          <path d="M5 13l4 4L19 7" stroke="#0a0a0a" stroke-width="3"
+            stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+    </div>
+
+    <h1>Benefício validado</h1>
+    <p class="sucesso-sub">O desconto do cliente foi aplicado com sucesso.</p>
 
     <button class="btn btn-primary" onclick="voltar()">
       Voltar

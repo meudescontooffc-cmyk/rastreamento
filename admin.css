@@ -255,6 +255,15 @@ h2 {
   margin-top: 8px;
 }
 
+/* Sub-containers dinâmicos (Pagamentos, Empresas) que ficam dentro de
+   #lista mas precisam do próprio espaçamento entre cards, já que o gap
+   do #lista só afeta filhos diretos. */
+.sub-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 /* =====================================
    🔥 CARD BASE
 ===================================== */
@@ -547,11 +556,13 @@ h2 {
   max-width: 520px;
   max-height: 85vh;
   overflow-y: auto;
+  overflow-x: hidden;
   background: #111;
   border: 1px solid rgba(255,215,0,0.15);
   border-radius: 20px;
   padding: 20px;
   animation: fadeIn .25s ease;
+  box-sizing: border-box;
 }
 
 .modal-topo {
@@ -881,4 +892,770 @@ h2 {
     font-size: 12px;
     padding: 7px 13px;
   }
+}
+
+/* =====================================
+   ✨ MODAL GERAR CÓDIGO
+===================================== */
+.modal-box-gerar {
+  max-width: 460px;
+  width: 92%;
+  max-height: 88vh;
+  overflow-y: auto;
+}
+
+.form-gerar {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 20px;
+}
+
+.form-grupo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+
+.form-grupo label {
+  font-size: 12px;
+  font-weight: 700;
+  color: gold;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.form-grupo input[type="text"],
+.form-grupo input[type="date"],
+.form-grupo input[type="tel"],
+.form-grupo select {
+  background: #141414;
+  border: 1px solid rgba(255,215,0,0.3);
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: white;
+  font-size: 14px;
+  outline: none;
+  transition: 0.25s;
+  width: 100%;
+}
+
+.form-grupo input:focus,
+.form-grupo select:focus {
+  border-color: gold;
+  box-shadow: 0 0 14px rgba(255,215,0,0.25);
+}
+
+.form-grupo select option {
+  background: #141414;
+  color: white;
+}
+
+/* Plano */
+.plano-opcoes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  min-width: 0;
+}
+
+.plano-btn {
+  background: #141414;
+  border: 1px solid rgba(255,215,0,0.25);
+  border-radius: 12px;
+  padding: 14px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: 0.25s;
+  color: white;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.plano-btn:hover {
+  border-color: rgba(255,215,0,0.6);
+  background: #1c1c1c;
+}
+
+.plano-btn.selecionado {
+  border-color: gold;
+  background: linear-gradient(135deg, rgba(184,134,11,0.18), rgba(255,215,0,0.1));
+  box-shadow: 0 0 16px rgba(255,215,0,0.25);
+}
+
+.plano-nome {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: gold;
+}
+
+.plano-opcoes-3 {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.plano-btn-neutro {
+  border-style: dashed;
+  border-color: rgba(170,170,170,0.4);
+}
+
+.plano-btn-neutro:hover {
+  border-color: rgba(170,170,170,0.7);
+}
+
+.plano-btn-neutro.selecionado {
+  border-color: #bbb;
+  border-style: solid;
+  background: linear-gradient(135deg, rgba(120,120,120,0.18), rgba(200,200,200,0.08));
+  box-shadow: 0 0 16px rgba(200,200,200,0.2);
+}
+
+.plano-btn-neutro .plano-nome {
+  color: #ccc;
+}
+
+.plano-aviso {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #aaa;
+}
+
+/* Upload de foto */
+.foto-upload-wrap {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.foto-preview {
+  width: 64px;
+  height: 64px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: #141414;
+  border: 1px solid rgba(255,215,0,0.3);
+  flex-shrink: 0;
+}
+
+.foto-upload-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  text-align: left;
+}
+
+.foto-upload-info input[type="file"] {
+  color: white;
+  font-size: 12px;
+}
+
+.foto-upload-info small {
+  color: #888;
+  font-size: 11px;
+}
+
+.foto-status {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.foto-status.ok    { color: #4caf50; }
+.foto-status.erro  { color: #ff5252; }
+.foto-status.carregando { color: gold; }
+
+/* Footer do modal gerar */
+.modal-footer-gerar {
+  padding: 16px 20px 22px;
+  border-top: 1px solid rgba(255,215,0,0.15);
+}
+
+.btn-gerar-confirmar {
+  width: 100%;
+  padding: 14px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* =====================================
+   💳 BOTÃO DE PAGAMENTO (lista/cards)
+===================================== */
+.btn-pagamento {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border: none;
+  border-radius: 30px;
+  background: linear-gradient(135deg, #0d7d3e, #1fae5c);
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: 0.25s;
+  box-shadow: 0 4px 14px rgba(31,174,92,0.25);
+}
+
+.btn-pagamento:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(31,174,92,0.4);
+}
+
+/* =====================================
+   💳 SUBMENU PAGAMENTOS (Pendentes / Pago)
+===================================== */
+.submenu-pagamentos {
+  display: flex;
+  gap: 10px;
+  margin: 4px 0 18px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.subbtn-pagamento {
+  padding: 10px 22px;
+  border-radius: 30px;
+  border: 1px solid rgba(255,215,0,0.25);
+  background: #141414;
+  color: #ccc;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: 0.25s;
+}
+
+.subbtn-pagamento:hover {
+  border-color: rgba(255,215,0,0.5);
+  color: white;
+}
+
+.subbtn-pagamento.ativo {
+  background: linear-gradient(135deg, #b8860b, #ffd700);
+  color: #111;
+  border-color: gold;
+  box-shadow: 0 0 14px rgba(255,215,0,0.35);
+}
+
+/* Card de pagamento */
+.card-pagamento {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.tag-pendente {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255,82,82,0.12);
+  border: 1px solid rgba(255,82,82,0.35);
+  color: #ff5252;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+
+.tag-pago {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(76,175,80,0.12);
+  border: 1px solid rgba(76,175,80,0.35);
+  color: #4caf50;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+
+/* =========================================
+   📅 MODAL PLANOS DO CLIENTE
+========================================= */
+
+.modal-box-planos {
+  max-width: 480px;
+  box-sizing: border-box;
+}
+
+.modal-box-planos * {
+  box-sizing: border-box;
+}
+
+.btn-planos {
+  font-size: 12px;
+}
+
+.planos-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: #ccc;
+  margin-bottom: 8px;
+  letter-spacing: 0.02em;
+}
+
+.planos-grid-info {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 10px;
+  min-width: 0;
+}
+
+.planos-info-box {
+  background: #161616;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.planos-info-label {
+  font-size: 11px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.planos-info-valor {
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.planos-ajuste-linha {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.planos-ajuste-linha input[type="number"] {
+  background: #161616;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  color: #fff;
+  padding: 10px 12px;
+  font-size: 14px;
+  width: 100%;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.planos-ajuste-linha input[type="number"]:focus {
+  outline: none;
+  border-color: rgba(255,215,0,0.5);
+}
+
+.planos-ajuste-linha .btn-acao {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.planos-hist-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 180px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.planos-hist-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: #161616;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+
+.planos-hist-plano {
+  font-weight: 700;
+  color: gold;
+  flex: 1;
+}
+
+.planos-hist-dias {
+  color: #4caf50;
+  font-weight: 600;
+}
+
+.planos-hist-data {
+  color: #888;
+  font-family: monospace;
+  font-size: 11px;
+}
+
+.planos-hist-vazio {
+  list-style: none;
+  color: #666;
+  font-size: 12px;
+  text-align: center;
+  padding: 14px 0;
+}
+
+.planos-preview {
+  background: #161616;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color .25s, background .25s;
+}
+
+.planos-preview-ativo {
+  border-color: rgba(255,215,0,0.4);
+  background: rgba(255,215,0,0.05);
+}
+
+.planos-preview-linha {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: #ddd;
+}
+
+.planos-footer-acoes {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.planos-footer-acoes .btn-acao {
+  flex: 1;
+  text-align: center;
+}
+
+.planos-footer-acoes .btn-acao:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* =========================================
+   📡 RASTREAMENTO — QR Code por empresa (modal individual)
+========================================= */
+
+.modal-box-rastreamento {
+  max-width: 440px;
+  box-sizing: border-box;
+}
+
+.modal-box-rastreamento * {
+  box-sizing: border-box;
+}
+
+.rastreio-status-linha {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: #ccc;
+  margin-top: 4px;
+}
+
+/* Toggle switch (ativar/desativar rastreamento) */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: #3a3a3a;
+  border-radius: 24px;
+  transition: .25s;
+}
+
+.toggle-slider::before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #fff;
+  border-radius: 50%;
+  transition: .25s;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background-color: #2e7d32;
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(20px);
+}
+
+.rastreio-qr-centro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.rastreio-qr-wrap {
+  flex-shrink: 0;
+  background: #fff;
+  padding: 10px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 210px;
+  aspect-ratio: 1 / 1;
+  box-sizing: border-box;
+}
+
+.rastreio-qr-wrap img,
+.rastreio-qr-wrap canvas {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.rastreio-link-linha {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  width: 100%;
+}
+
+.rastreio-link-linha input {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  background: #161616;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  color: #999;
+  padding: 10px 12px;
+  font-size: 11px;
+  font-family: monospace;
+  cursor: pointer;
+}
+
+.rastreio-link-linha .btn-acao {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.rastreio-acoes {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.rastreio-acoes .btn-acao {
+  flex: 1 1 auto;
+  white-space: nowrap;
+  text-align: center;
+}
+
+/* =========================================
+   COMISSAO POR EMPRESA
+========================================= */
+
+.comissao-bloco {
+  display: flex;
+  flex-direction: column;
+}
+
+.comissao-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.comissao-total-geral {
+  font-size: 18px;
+  font-weight: 800;
+  color: #ffd700;
+}
+
+.comissao-plano-box {
+  background: #141414;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.comissao-plano-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.comissao-plano-topo strong {
+  color: #fff;
+  font-size: 14px;
+}
+
+.comissao-plano-valor {
+  color: #4caf50;
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.comissao-campos-linha {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  min-width: 0;
+}
+
+.comissao-campo {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.comissao-campo label {
+  display: block;
+  font-size: 10.5px;
+  color: #888;
+  margin-bottom: 4px;
+}
+
+.comissao-campo input {
+  width: 100%;
+  box-sizing: border-box;
+  background: #1a1a1a;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  color: #fff;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.comissao-campo input:focus {
+  outline: none;
+  border-color: rgba(255,215,0,0.5);
+}
+
+.comissao-campos-linha .btn-acao {
+  flex: 1 1 0;
+  min-width: 0;
+  white-space: nowrap;
+  text-align: center;
+  font-size: 12px;
+}
+
+.comissao-vendas-atual {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: rgba(255,215,0,0.05);
+  border: 1px solid rgba(255,215,0,0.12);
+  border-radius: 10px;
+}
+
+.comissao-vendas-atual-num {
+  font-size: 20px;
+  font-weight: 800;
+  color: #ffd700;
+}
+
+.comissao-vendas-atual-label {
+  font-size: 12px;
+  color: #999;
+}
+
+.comissao-btn-somar {
+  flex: 0 0 auto !important;
+  align-self: flex-end;
+  white-space: nowrap;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+/* =========================================
+   BUSCA DE EMPRESA (lupa)
+========================================= */
+
+.busca-empresa-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 140px;
+  max-width: 220px;
+}
+
+.busca-empresa-icone {
+  position: absolute;
+  left: 10px;
+  color: #777;
+  pointer-events: none;
+}
+
+.busca-empresa-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: #161616;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 20px;
+  color: #fff;
+  padding: 7px 12px 7px 30px;
+  font-size: 12.5px;
+}
+
+.busca-empresa-input:focus {
+  outline: none;
+  border-color: rgba(255,215,0,0.5);
+}
+
+.busca-empresa-input::placeholder {
+  color: #666;
 }

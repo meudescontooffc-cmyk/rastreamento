@@ -93,7 +93,7 @@ const numeros = [
   document.getElementById("c6")
 ];
 
-const PAGE = 15;
+const PAGE = 10;
 
 
 /* =========================================
@@ -134,6 +134,28 @@ function restaurarBtnAtivo() {
     const btn = document.getElementById(id);
     if (btn) btn.classList.add("active");
   } catch (_) {}
+}
+
+// Reexecuta a MESMA aba/filtro que estava ativo antes (Ativos, Inativos,
+// Pagamentos, Todos, etc.) em vez de sempre cair na lista geral. Evita que
+// ações feitas dentro de um modal (ex: salvar um plano) troquem a pessoa
+// de aba sem querer ao fechar.
+function recarregarViewAtual() {
+  let id;
+  try { id = sessionStorage.getItem("adminActiveBtn"); } catch (_) { id = null; }
+
+  const mapa = {
+    "btn-ativos":      () => verAtivos("btn-ativos"),
+    "btn-inativos":    () => verInativos("btn-inativos"),
+    "btn-validacoes":  () => verValidacoes("btn-validacoes"),
+    "btn-empresas":    () => verEmpresas("btn-empresas"),
+    "btn-premiacoes":  () => verPremiacoes("btn-premiacoes"),
+    "btn-sorteios":    () => verSorteios("btn-sorteios"),
+    "btn-pagamentos":  () => verPagamentos("btn-pagamentos"),
+    "btn-todos":       () => listarClientes("btn-todos")
+  };
+
+  (mapa[id] || (() => listarClientes("btn-todos")))();
 }
 
 
@@ -215,7 +237,20 @@ function paginar(itens, renderFn) {
 ========================================= */
 
 estadoSelect.addEventListener("change", () => {
+  estadoInput.value = estadoSelect.value;
   numeros[0].focus();
+});
+
+// Permite digitar a UF diretamente no input (ex: "MA", "SP"), em vez de
+// precisar abrir o select. Sincroniza com o select quando a sigla bate
+// com uma das opções disponíveis, senão mantém o valor digitado mesmo assim.
+estadoInput.addEventListener("input", () => {
+  estadoInput.value = estadoInput.value.replace(/[^a-zA-Z]/g, "").toUpperCase().slice(0, 2);
+
+  const opcoes = Array.from(estadoSelect.options).map(o => o.value);
+  estadoSelect.value = opcoes.includes(estadoInput.value) ? estadoInput.value : "";
+
+  if (estadoInput.value.length === 2) numeros[0].focus();
 });
 
 numeros.forEach((input, i) => {
@@ -244,26 +279,183 @@ async function gerarCodigoUnico() {
   }
 }
 
+/* =========================================
+   ✨ MODAL GERAR CÓDIGO — Novo Cliente
+========================================= */
+
+let _planoSelecionado = null;
+
 window.gerarCodigo = async function() {
   await assertAdmin();
-  const nomeRaw = prompt("Digite o nome do cliente:");
-  if (!nomeRaw?.trim()) { alert("Nome obrigatório ❗"); return; }
-  const nome = nomeRaw.trim().slice(0, 100); // 🔒 limita tamanho
+  abrirModalGerar();
+};
 
-  const codigo = await gerarCodigoUnico();
+function abrirModalGerar() {
+  // Reset do formulário
+  document.getElementById("gc-nome").value = "";
+  document.getElementById("gc-nascimento").value = "";
+  document.getElementById("gc-telefone").value = "";
+  document.getElementById("gc-uf").value = "";
+  document.getElementById("gc-foto-link").value = "";
+  document.getElementById("gc-foto-preview").src = "";
+  document.getElementById("gc-foto-status").textContent = "";
+  document.getElementById("gc-foto-status").className = "foto-status";
+  document.querySelectorAll(".plano-btn").forEach(b => b.classList.remove("selecionado"));
+  document.getElementById("plano-pendente-aviso")?.classList.add("hidden");
+  _planoSelecionado = null;
 
-  // UID do documento = código; campo id = código também
-  await setDoc(doc(db, "clientes", codigo), {
-    nome,
-    id: codigo,
-    status: "ativo",
-    foto: "",
-    criadoEm: serverTimestamp()
-  });
+  document.getElementById("modalGerarCodigo").classList.remove("hidden");
+}
 
-  cache.del("clientes");
-  alert(`Cliente criado ✅\nCódigo: ${codigo}`);
-  listarClientes();
+window.fecharModalGerar = function() {
+  document.getElementById("modalGerarCodigo").classList.add("hidden");
+};
+
+window.selecionarPlano = function(plano) {
+  _planoSelecionado = plano;
+  document.querySelectorAll(".plano-btn").forEach(b => b.classList.remove("selecionado"));
+  document.getElementById(`plano-${plano}`).classList.add("selecionado");
+
+  const aviso = document.getElementById("plano-pendente-aviso");
+  if (aviso) aviso.classList.toggle("hidden", plano !== "pendente");
+};
+
+// Mascara o telefone enquanto digita
+document.addEventListener("DOMContentLoaded", () => {
+  const tel = document.getElementById("gc-telefone");
+  if (tel) {
+    tel.addEventListener("input", () => {
+      let v = tel.value.replace(/\D/g, "").slice(0, 11);
+      if (v.length > 10) v = v.replace(/(\d{2})(\d{5})(\d{0,4})/, "($1) $2-$3");
+      else if (v.length > 6) v = v.replace(/(\d{2})(\d{4})(\d{0,4})/, "($1) $2-$3");
+      else if (v.length > 2) v = v.replace(/(\d{2})(\d{0,5})/, "($1) $2");
+      tel.value = v;
+    });
+  }
+
+  // Máscara da data de nascimento (DD/MM/AAAA)
+  const nasc = document.getElementById("gc-nascimento");
+  if (nasc) {
+    nasc.addEventListener("input", () => {
+      let v = nasc.value.replace(/\D/g, "").slice(0, 8);
+      if (v.length > 4) v = v.replace(/(\d{2})(\d{2})(\d{0,4})/, "$1/$2/$3");
+      else if (v.length > 2) v = v.replace(/(\d{2})(\d{0,2})/, "$1/$2");
+      nasc.value = v;
+    });
+  }
+});
+
+// Preview da foto a partir do link colado
+window.previewFotoLink = function(event) {
+  const url = event.target.value.trim();
+  const preview = document.getElementById("gc-foto-preview");
+  const status = document.getElementById("gc-foto-status");
+
+  if (!url) {
+    preview.src = "";
+    status.textContent = "";
+    status.className = "foto-status";
+    return;
+  }
+
+  status.textContent = "Carregando imagem...";
+  status.className = "foto-status carregando";
+
+  // Testa se a imagem carrega antes de exibir
+  const testImg = new Image();
+  testImg.onload = () => {
+    preview.src = url;
+    status.textContent = "Imagem válida ✓";
+    status.className = "foto-status ok";
+  };
+  testImg.onerror = () => {
+    preview.src = "";
+    status.textContent = "Não foi possível carregar essa imagem ❗";
+    status.className = "foto-status erro";
+  };
+  testImg.src = url;
+};
+
+window.confirmarGerarCodigo = async function() {
+  await assertAdmin();
+
+  const nome       = document.getElementById("gc-nome").value.trim().slice(0, 100);
+  const nascimento = document.getElementById("gc-nascimento").value.trim();
+  const telefone   = document.getElementById("gc-telefone").value.trim();
+  const uf         = document.getElementById("gc-uf").value.trim().toUpperCase();
+  const fotoLink   = document.getElementById("gc-foto-link").value.trim();
+
+  if (!nome)             { alert("Informe o nome do cliente ❗"); return; }
+  if (!nascimento)       { alert("Informe a data de nascimento ❗"); return; }
+  if (!telefone)         { alert("Informe o telefone ❗"); return; }
+  if (!_planoSelecionado){ alert("Selecione um plano (Mensal, Anual ou Pendente) ❗"); return; }
+  if (!uf)               { alert("Selecione a UF ❗"); return; }
+
+  const btnConfirmar = document.querySelector(".btn-gerar-confirmar");
+  btnConfirmar.disabled = true;
+  btnConfirmar.textContent = "Gerando...";
+
+  try {
+    // Gera código único usando a UF escolhida no modal
+    let codigo;
+    while (true) {
+      const num = Math.floor(100000 + Math.random() * 900000);
+      const tentativa = `${uf}-${num}`;
+      const snap = await getDoc(doc(db, "clientes", tentativa));
+      if (!snap.exists()) { codigo = tentativa; break; }
+    }
+
+    let planoInfo;
+    if (_planoSelecionado === "anual") {
+      planoInfo = { plano: "Anual",  valorPlano: CATALOGO_PLANOS.Anual.valor, dias: CATALOGO_PLANOS.Anual.dias };
+    } else if (_planoSelecionado === "pendente") {
+      planoInfo = { plano: "Pendente", valorPlano: CATALOGO_PLANOS.Pendente.valor, dias: CATALOGO_PLANOS.Pendente.dias };
+    } else {
+      planoInfo = { plano: "Mensal", valorPlano: CATALOGO_PLANOS.Mensal.valor,  dias: CATALOGO_PLANOS.Mensal.dias };
+    }
+
+    // Plano "Pendente" (neutro) nasce inativo: ID existe, mas só ativa
+    // depois que o pagamento (Pix/Cartão) for confirmado no site de pagamento.
+    const statusInicial = _planoSelecionado === "pendente" ? "inativo" : "ativo";
+
+    // "Pendente" não é um pagamento de fato — não entra no histórico de planos
+    // nem conta como "pagamento iniciado". É só um ID reservado, sem dias.
+    const historicoPlanos = _planoSelecionado === "pendente"
+      ? []
+      : [{ plano: planoInfo.plano, dias: planoInfo.dias, valor: planoInfo.valorPlano, data: Date.now() }];
+
+    await setDoc(doc(db, "clientes", codigo), {
+      nome,
+      id: codigo,
+      status: statusInicial,
+      foto: fotoLink,
+      nascimento,
+      telefone,
+      plano: planoInfo.plano,
+      valorPlano: planoInfo.valorPlano,
+      diasRestantes: planoInfo.dias,
+      historicoPlanos,
+      // Marca se o cliente já efetuou algum pagamento real (Mensal/Anual).
+      // Usado para diferenciar "nunca pagou" (não aparece em Pendentes de pagamento)
+      // de "já pagou e venceu" (aparece em Pendentes, precisa renovar).
+      pagamentoIniciado: _planoSelecionado !== "pendente",
+      // Referência inicial da contagem automática de dias (1 dia descontado por dia corrido).
+      ultimaAtualizacaoDias: dataDeHojeISO(),
+      criadoEm: serverTimestamp()
+    });
+
+    cache.del("clientes");
+    fecharModalGerar();
+    alert(`Cliente criado \n\nNome: ${nome}\nCódigo: ${codigo}\nPlano: ${planoInfo.plano}\nStatus: ${statusInicial === "ativo" ? "Ativo" : "Inativo (aguardando pagamento)"}`);
+    listarClientes();
+
+  } catch (e) {
+    console.error(e);
+    alert("Erro ao gerar cliente ❌");
+  } finally {
+    btnConfirmar.disabled = false;
+    btnConfirmar.textContent = "Gerar código do cliente";
+  }
 };
 
 
@@ -289,7 +481,8 @@ function criarCard(c, docId) {
       <p class="status ${sStatus}" style="margin:2px 0;">${sStatus}</p>
       <p style="margin:2px 0;font-size:12px;color:#aaa;font-family:monospace;">${sId}</p>
     </div>
-    <div class="acao" style="display:flex;align-items:center;justify-content:flex-end;flex-shrink:0;">
+    <div class="acao" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-shrink:0;">
+      <button class="btn-acao btn-detalhes btn-planos" onclick="abrirPlanos('${sDocId}')">Planos</button>
       ${c.status === "ativo"
         ? `<button class="btn-acao btn-inativar" onclick="inativar('${sDocId}')">Inativar</button>`
         : `<button class="btn-acao btn-ativar"   onclick="ativar('${sDocId}')">Ativar</button>`}
@@ -297,11 +490,513 @@ function criarCard(c, docId) {
   lista.appendChild(card);
 }
 
+/* =========================================
+   📅 PLANOS DO CLIENTE
+========================================= */
+
+// Catálogo único de planos — usado aqui e no modal "Gerar Código"
+const CATALOGO_PLANOS = {
+  Mensal:    { dias: 30,  valor: 19.90 },
+  Anual:     { dias: 365, valor: 149.90 },
+  Pendente:  { dias: 0,   valor: 0 }
+};
+
+let _planosDocIdAtual = null;
+let _planosOriginal   = null; // snapshot do que está salvo no Firebase
+let _planosSimulado   = null; // edição em andamento, ainda não salva
+
+function formatarDataHist(ts) {
+  let d;
+  if (!ts) return "—";
+  if (typeof ts === "number") d = new Date(ts);
+  else if (ts.toDate) d = ts.toDate();
+  else if (ts.seconds) d = new Date(ts.seconds * 1000);
+  else d = new Date(ts);
+  if (isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+function tempoDesde(ts) {
+  let d;
+  if (!ts) return "—";
+  if (typeof ts === "number") d = new Date(ts);
+  else if (ts.toDate) d = ts.toDate();
+  else if (ts.seconds) d = new Date(ts.seconds * 1000);
+  else d = new Date(ts);
+  if (isNaN(d.getTime())) return "—";
+
+  const diffMs = Date.now() - d.getTime();
+  const diasTotais = Math.floor(diffMs / 86400000);
+  if (diasTotais < 1) return "Hoje";
+  if (diasTotais < 30) return `${diasTotais} dia${diasTotais > 1 ? "s" : ""}`;
+  const meses = Math.floor(diasTotais / 30);
+  if (meses < 12) return `${meses} ${meses > 1 ? "meses" : "mês"}`;
+  const anos = Math.floor(meses / 12);
+  const mesesResto = meses % 12;
+  return mesesResto > 0 ? `${anos} ano${anos > 1 ? "s" : ""} e ${mesesResto} ${mesesResto > 1 ? "meses" : "mês"}` : `${anos} ano${anos > 1 ? "s" : ""}`;
+}
+
+window.abrirPlanos = async function(docId) {
+  await assertAdmin();
+  _planosDocIdAtual = docId;
+
+  const modal = document.getElementById("modalPlanos");
+  modal.classList.remove("hidden");
+  document.getElementById("conteudoPlanos").innerHTML = "Carregando...";
+
+  await carregarESimularPlanos(docId);
+};
+
+window.fecharModalPlanos = function() {
+  document.getElementById("modalPlanos").classList.add("hidden");
+  _planosDocIdAtual = null;
+  _planosOriginal = null;
+  _planosSimulado = null;
+  // Garante que a lista por trás do modal reflita a aba que estava ativa,
+  // já que abrir/editar o plano pode ter mudado status/dias de algum cliente.
+  recarregarViewAtual();
+};
+
+// Busca o cliente no Firebase e guarda um snapshot original + uma cópia
+// "simulada" que é a que a tela edita. Nada é salvo até clicar em Salvar.
+async function carregarESimularPlanos(docId) {
+  const snap = await getDoc(doc(db, "clientes", docId));
+  if (!snap.exists()) {
+    document.getElementById("conteudoPlanos").innerHTML = "<p>Cliente não encontrado ❌</p>";
+    return;
+  }
+
+  // Garante que os dias exibidos já estão descontados corretamente antes de simular.
+  const corrigidos = await aplicarContagemDeDiasEmLote([{ data: snap.data(), id: snap.id }]);
+  cache.del("clientes");
+  const c = corrigidos[0].data;
+
+  _planosOriginal = c;
+  _planosSimulado = {
+    plano: c.plano || "Mensal",
+    diasRestantes: Number(c.diasRestantes || 0),
+    trocouPlano: false // só vira true se o admin clicar em algum dos 3 planos
+  };
+
+  renderizarModalPlanos();
+}
+
+function renderizarModalPlanos() {
+  const c = _planosOriginal;
+  const sim = _planosSimulado;
+  const docId = _planosDocIdAtual;
+  if (!c || !sim) return;
+
+  const sNome  = sanitize(c.nome);
+  const sId    = sanitize(docId);
+  const hist   = Array.isArray(c.historicoPlanos) ? c.historicoPlanos : [];
+
+  // Valores ATUAIS (salvos de fato no Firebase)
+  const planoAtual = c.plano || "—";
+  const diasAtuais  = Number(c.diasRestantes || 0);
+
+  // Valores SIMULADOS (o que vai ser salvo se clicar em "Salvar alterações")
+  const planoSim = sim.plano;
+  const diasSim  = sim.diasRestantes;
+
+  const houveMudanca = planoSim !== planoAtual || diasSim !== diasAtuais;
+
+  // Soma geral de todos os dias já adquiridos no histórico (caso tenha comprado várias vezes)
+  const diasTotaisComprados = hist.reduce((soma, h) => soma + Number(h.dias || 0), 0);
+  const valorTotalGasto     = hist.reduce((soma, h) => soma + Number(h.valor || 0), 0);
+
+  const linhasHistorico = hist.length
+    ? hist.slice().reverse().map(h => `
+        <li class="planos-hist-item">
+          <span class="planos-hist-plano">${sanitize(h.plano || "—")}</span>
+          <span class="planos-hist-dias">${h.dias > 0 ? `+${h.dias} dias` : "0 dias"}</span>
+          <span class="planos-hist-data">${formatarDataHist(h.data)}</span>
+        </li>`).join("")
+    : `<li class="planos-hist-vazio">Nenhum plano pago registrado ainda.</li>`;
+
+  document.getElementById("conteudoPlanos").innerHTML = `
+    <div class="planos-resumo">
+      <h4 style="margin:0 0 2px;">${sNome}</h4>
+      <p style="margin:0 0 12px;font-size:12px;color:#aaa;font-family:monospace;">${sId}</p>
+
+      <div class="planos-grid-info">
+        <div class="planos-info-box">
+          <span class="planos-info-label">Plano atual (salvo)</span>
+          <span class="planos-info-valor">${sanitize(planoAtual)}</span>
+        </div>
+        <div class="planos-info-box">
+          <span class="planos-info-label">Dias restantes (salvo)</span>
+          <span class="planos-info-valor" style="color:${diasAtuais > 0 ? '#4caf50' : '#ff5252'}">${diasAtuais}</span>
+        </div>
+        <div class="planos-info-box">
+          <span class="planos-info-label">Dias comprados (total)</span>
+          <span class="planos-info-valor">${diasTotaisComprados}</span>
+        </div>
+        <div class="planos-info-box">
+          <span class="planos-info-label">Cliente há</span>
+          <span class="planos-info-valor">${tempoDesde(c.criadoEm)}</span>
+        </div>
+        <div class="planos-info-box">
+          <span class="planos-info-label">ID gerado em</span>
+          <span class="planos-info-valor" style="font-size:13px;">${formatarDataHist(c.criadoEm)}</span>
+        </div>
+      </div>
+
+      <p style="margin:10px 0 0;font-size:12px;color:#888;">Total já pago: <strong style="color:#FFD700;">R$ ${valorTotalGasto.toFixed(2).replace(".", ",")}</strong></p>
+    </div>
+
+    <div class="linha" style="margin:16px 0;"></div>
+
+    <div class="planos-trocar">
+      <label class="planos-label">Trocar plano <span style="color:#777;font-weight:400;">(simulação — só aplica ao salvar)</span></label>
+      <div class="plano-opcoes plano-opcoes-3">
+        <button type="button" class="plano-btn ${planoSim === 'Mensal' ? 'selecionado' : ''}" onclick="simularPlanoCliente('Mensal')">
+          <span class="plano-nome">Mensal</span>
+          <span class="plano-preco">+30 dias</span>
+        </button>
+        <button type="button" class="plano-btn ${planoSim === 'Anual' ? 'selecionado' : ''}" onclick="simularPlanoCliente('Anual')">
+          <span class="plano-nome">Anual</span>
+          <span class="plano-preco">+365 dias</span>
+        </button>
+        <button type="button" class="plano-btn plano-btn-neutro ${planoSim === 'Pendente' ? 'selecionado' : ''}" onclick="simularPlanoCliente('Pendente')">
+          <span class="plano-nome">Pendente</span>
+          <span class="plano-preco">+0 dias</span>
+        </button>
+      </div>
+      <small style="display:block;margin-top:6px;font-size:11px;color:#777;">Clicar só pré-visualiza. Soma os dias do plano escolhido aos dias restantes atuais — nada é salvo até clicar em "Salvar alterações".</small>
+    </div>
+
+    <div class="linha" style="margin:16px 0;"></div>
+
+    <div class="planos-ajuste">
+      <label class="planos-label">Definir dias restantes (valor exato)</label>
+      <div class="planos-ajuste-linha">
+        <input type="number" id="planos-input-definir" placeholder="Ex: 45" style="flex:1;">
+        <button class="btn-acao btn-detalhes" onclick="simularDefinirDias()">Pré-visualizar</button>
+      </div>
+      <small style="display:block;margin-top:6px;font-size:11px;color:#777;">Substitui o saldo simulado pelo número exato de dias digitado. Só salva ao clicar em "Salvar alterações".</small>
+    </div>
+
+    <div class="planos-ajuste" style="margin-top:14px;">
+      <label class="planos-label">Adicionar / remover dias (somar ao saldo simulado)</label>
+      <div class="planos-ajuste-linha">
+        <input type="number" id="planos-input-dias" placeholder="Ex: 15 ou -10" style="flex:1;">
+        <button class="btn-acao btn-detalhes" onclick="simularAjusteDias()">Pré-visualizar</button>
+      </div>
+      <small style="display:block;margin-top:6px;font-size:11px;color:#777;">Use número negativo para remover dias. Só salva ao clicar em "Salvar alterações".</small>
+    </div>
+
+    <div class="linha" style="margin:16px 0;"></div>
+
+    <div class="planos-preview ${houveMudanca ? 'planos-preview-ativo' : ''}">
+      <span class="planos-info-label">Pré-visualização do resultado</span>
+      <div class="planos-preview-linha">
+        <span>Plano: <strong>${sanitize(planoSim)}</strong></span>
+        <span>Dias restantes: <strong style="color:${diasSim > 0 ? '#4caf50' : '#ff5252'}">${diasSim}</strong></span>
+      </div>
+      ${houveMudanca ? '<small style="color:#FFD700;">⚠ Alterações não salvas. Clique em "Salvar alterações" para confirmar.</small>' : '<small style="color:#666;">Nenhuma alteração pendente.</small>'}
+    </div>
+
+    <div class="linha" style="margin:16px 0;"></div>
+
+    <div class="planos-historico">
+      <label class="planos-label">Histórico de pagamentos</label>
+      <ul class="planos-hist-lista">${linhasHistorico}</ul>
+    </div>
+
+    <div class="planos-footer-acoes">
+      <button class="btn-acao btn-detalhes" onclick="cancelarSimulacaoPlanos()" ${!houveMudanca ? "disabled" : ""}>Cancelar alteração</button>
+      <button class="btn-acao btn-ativar" onclick="salvarPlanosCliente()" ${!houveMudanca ? "disabled" : ""}>Salvar alterações</button>
+    </div>
+  `;
+}
+
+// Clicar num plano só atualiza a simulação em memória — NADA é salvo ainda.
+// Some os dias do plano clicado ao saldo simulado atual (não ao saldo salvo),
+// assim dá pra simular várias trocas em sequência antes de salvar.
+window.simularPlanoCliente = function(novoPlano) {
+  if (!_planosSimulado) return;
+  const info = CATALOGO_PLANOS[novoPlano];
+  if (!info) return;
+
+  _planosSimulado.plano = novoPlano;
+  _planosSimulado.diasRestantes = _planosSimulado.diasRestantes + info.dias;
+  _planosSimulado.trocouPlano = true;
+
+  renderizarModalPlanos();
+};
+
+window.simularDefinirDias = function() {
+  if (!_planosSimulado) return;
+  const input = document.getElementById("planos-input-definir");
+  const valor = parseInt(input.value, 10);
+  if (isNaN(valor)) { alert("Informe um número de dias válido (ex: 45) ❗"); return; }
+
+  _planosSimulado.diasRestantes = valor;
+  renderizarModalPlanos();
+};
+
+window.simularAjusteDias = function() {
+  if (!_planosSimulado) return;
+  const input = document.getElementById("planos-input-dias");
+  const valor = parseInt(input.value, 10);
+  if (!valor || isNaN(valor)) { alert("Informe um número de dias válido (ex: 15 ou -10) ❗"); return; }
+
+  _planosSimulado.diasRestantes = _planosSimulado.diasRestantes + valor;
+  renderizarModalPlanos();
+};
+
+// Descarta a simulação e volta tudo para o que está salvo no Firebase.
+window.cancelarSimulacaoPlanos = function() {
+  if (!_planosOriginal) return;
+  _planosSimulado = {
+    plano: _planosOriginal.plano || "Mensal",
+    diasRestantes: Number(_planosOriginal.diasRestantes || 0),
+    trocouPlano: false
+  };
+  renderizarModalPlanos();
+};
+
+// Só AQUI a gravação no Firebase de fato acontece — clicando em "Salvar alterações".
+window.salvarPlanosCliente = async function() {
+  await assertAdmin();
+  if (!_planosDocIdAtual || !_planosOriginal || !_planosSimulado) return;
+
+  const c   = _planosOriginal;
+  const sim = _planosSimulado;
+  const info = CATALOGO_PLANOS[sim.plano];
+
+  if (!confirm(`Confirma salvar as alterações?\n\nPlano: ${sim.plano}\nDias restantes: ${sim.diasRestantes}`)) return;
+
+  const hist = Array.isArray(c.historicoPlanos) ? c.historicoPlanos : [];
+  // Só registra no histórico de pagamento se o admin realmente trocou de plano
+  // (e não é o plano "Pendente", que não é um pagamento real).
+  const ehPagamentoReal = sim.trocouPlano && sim.plano !== "Pendente";
+  if (ehPagamentoReal && info) {
+    hist.push({ plano: sim.plano, dias: info.dias, valor: info.valor, data: Date.now() });
+  }
+
+  const atualizacao = {
+    plano: sim.plano,
+    diasRestantes: sim.diasRestantes,
+    historicoPlanos: hist,
+    // Reseta a referência da contagem automática para hoje — evita que o
+    // próximo carregamento desconte dias "atrasados" sobre o valor que o
+    // admin acabou de definir manualmente.
+    ultimaAtualizacaoDias: dataDeHojeISO()
+  };
+  if (info) atualizacao.valorPlano = info.valor;
+  if (ehPagamentoReal) {
+    atualizacao.pagamentoIniciado = true;
+    // Ao trocar para um plano pago, garante que o cliente fique ativo
+    atualizacao.status = "ativo";
+  }
+
+  const ref = doc(db, "clientes", _planosDocIdAtual);
+  await updateDoc(ref, atualizacao);
+  cache.del("clientes");
+
+  alert("Alterações salvas ✅");
+  await carregarESimularPlanos(_planosDocIdAtual);
+  recarregarViewAtual();
+};
+
+/* =========================================
+   💳 PAGAMENTOS — Pendentes / Pagos
+========================================= */
+
+// 🔧 Ajuste esta URL para o domínio real do seu checkout
+const URL_CHECKOUT = "https://rastreamento-ad456.web.app";
+
+window.abrirPagamentoCliente = function(codigo) {
+  const url = `${URL_CHECKOUT}/?codigo=${encodeURIComponent(codigo)}`;
+  window.open(url, "_blank");
+};
+
+let _filtroPagamentoAtual = "pendentes";
+
+window.verPagamentos = async function(btnId) {
+  if (btnId) setActiveBtn(btnId);
+  const token = novaView();
+  lista.innerHTML = "Carregando pagamentos...";
+  fecharPainelConfig();
+
+  try {
+    const todos = await carregarClientes();
+    if (!viewAtiva(token)) return;
+
+    lista.innerHTML = "";
+
+    // ── Sub-menu Pendentes / Pago
+    const subMenu = document.createElement("div");
+    subMenu.className = "submenu-pagamentos";
+    subMenu.innerHTML = `
+      <button class="subbtn-pagamento" id="subbtn-pendentes" onclick="filtrarPagamentos('pendentes')">
+         Pendentes
+      </button>
+      <button class="subbtn-pagamento" id="subbtn-pagos" onclick="filtrarPagamentos('pagos')">
+         Pago
+      </button>`;
+    lista.appendChild(subMenu);
+
+    const containerCards = document.createElement("div");
+    containerCards.id = "containerPagamentos";
+    containerCards.className = "sub-lista";
+    lista.appendChild(containerCards);
+
+    renderizarListaPagamentos(todos, _filtroPagamentoAtual);
+
+  } catch (e) { console.error(e); lista.innerHTML = "Erro ao carregar ❌"; }
+  restaurarBtnAtivo();
+};
+
+window.filtrarPagamentos = async function(filtro) {
+  _filtroPagamentoAtual = filtro;
+  document.querySelectorAll(".subbtn-pagamento").forEach(b => b.classList.remove("ativo"));
+  document.getElementById(`subbtn-${filtro}`)?.classList.add("ativo");
+
+  const todos = await carregarClientes();
+  renderizarListaPagamentos(todos, filtro);
+};
+
+function renderizarListaPagamentos(todos, filtro) {
+  document.querySelectorAll(".subbtn-pagamento").forEach(b => b.classList.remove("ativo"));
+  document.getElementById(`subbtn-${filtro}`)?.classList.add("ativo");
+
+  const container = document.getElementById("containerPagamentos");
+  if (!container) return;
+  container.innerHTML = "";
+
+  // Pendente = dias restantes <= 0 — inclui tanto quem já pagou e venceu
+  // quanto quem nunca pagou ainda (plano "Pendente", aguardando 1º pagamento).
+  // Pago     = dias restantes > 0 (plano ativo, em dia).
+  const filtrados = todos.filter(({ data: d }) => {
+    const dias = Number(d.diasRestantes || 0);
+    return filtro === "pendentes" ? dias <= 0 : dias > 0;
+  });
+
+  if (!filtrados.length) {
+    const p = document.createElement("p");
+    p.style.cssText = "color:#666;font-size:13px;margin-top:16px";
+    p.textContent = filtro === "pendentes"
+      ? "Nenhum pagamento pendente "
+      : "Nenhum cliente com pagamento em dia ainda.";
+    container.appendChild(p);
+    return;
+  }
+
+  renderPaginado(container, filtrados, ({ data: d, id: docId }) => {
+    criarCardPagamento(d, docId, filtro);
+  });
+}
+
+function criarCardPagamento(c, docId, filtro) {
+  const container = document.getElementById("containerPagamentos");
+  const card = document.createElement("div");
+  card.className = "card card-pagamento";
+
+  const sNome  = sanitize(c.nome);
+  const sId    = sanitize(docId || c.id || "");
+  const sFoto  = sanitize(c.foto || "");
+  const sPlano = sanitize(c.plano || "—");
+  const dias   = Number(c.diasRestantes || 0);
+
+  const tagStatus = filtro === "pendentes"
+    ? '<span class="tag-pendente"> Pendente</span>'
+    : '<span class="tag-pago"> Pago</span>';
+
+  const diasTexto = sPlano === "Pendente" && dias === 0
+    ? "Aguardando 1º pagamento"
+    : dias > 0
+      ? `${dias} dia${dias > 1 ? "s" : ""} restante${dias > 1 ? "s" : ""}`
+      : `Vencido há ${Math.abs(dias)} dia${Math.abs(dias) !== 1 ? "s" : ""}`;
+
+  card.innerHTML = `
+    <img src="${sFoto || "https://via.placeholder.com/80"}" style="width:56px;height:56px;border-radius:8px;object-fit:cover;flex-shrink:0;">
+    <div class="info" style="flex:1;min-width:0;">
+      <h3 style="margin:0 0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${sNome}</h3>
+      <p style="margin:2px 0;font-size:12px;color:#aaa;font-family:monospace;">${sId}</p>
+      <p style="margin:4px 0;font-size:13px;"><strong>Plano:</strong> ${sPlano}</p>
+      <p style="margin:2px 0;font-size:13px;color:${dias > 0 ? "#4caf50" : "#ff5252"};"><strong>${diasTexto}</strong></p>
+      <div style="margin-top:6px;">${tagStatus}</div>
+    </div>`;
+  container.appendChild(card);
+}
+
+/* =========================================
+   📅 CONTAGEM AUTOMÁTICA DE DIAS
+   Desconta os dias corridos desde a última verificação de cada cliente.
+   Funciona mesmo que o painel fique dias sem ser aberto (desconta tudo de
+   uma vez, comparando data de hoje com a última data registrada).
+========================================= */
+
+function diasCorridosDesde(dataISO) {
+  if (!dataISO) return 0;
+  const hoje = new Date();
+  const hojeUTC = Date.UTC(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+
+  const [ano, mes, dia] = dataISO.split("-").map(Number);
+  const dataUTC = Date.UTC(ano, mes - 1, dia);
+
+  return Math.floor((hojeUTC - dataUTC) / 86400000);
+}
+
+function dataDeHojeISO() {
+  const hoje = new Date();
+  const ano = hoje.getFullYear();
+  const mes = String(hoje.getMonth() + 1).padStart(2, "0");
+  const dia = String(hoje.getDate()).padStart(2, "0");
+  return `${ano}-${mes}-${dia}`;
+}
+
+// Recebe a lista crua do Firestore, desconta os dias vencidos de cada
+// cliente que precisar, persiste as correções em paralelo e retorna a
+// lista já com os valores corrigidos (para renderizar na hora, sem esperar
+// um segundo round-trip).
+async function aplicarContagemDeDiasEmLote(todos) {
+  const hojeISO = dataDeHojeISO();
+  const atualizacoes = [];
+
+  const corrigidos = todos.map(({ data: c, id }) => {
+    if (c.diasRestantes === undefined || c.diasRestantes === null) {
+      return { data: c, id };
+    }
+
+    const ultimaAtualizacao = c.ultimaAtualizacaoDias || hojeISO;
+    const diasPassados = diasCorridosDesde(ultimaAtualizacao);
+
+    if (diasPassados <= 0) {
+      if (!c.ultimaAtualizacaoDias) {
+        atualizacoes.push(updateDoc(doc(db, "clientes", id), { ultimaAtualizacaoDias: hojeISO }).catch(() => {}));
+      }
+      return { data: c, id };
+    }
+
+    const diasAtuais = Number(c.diasRestantes || 0);
+    const novosDias = diasAtuais - diasPassados;
+    const novoStatus = novosDias <= 0 ? "inativo" : c.status;
+
+    atualizacoes.push(
+      updateDoc(doc(db, "clientes", id), {
+        diasRestantes: novosDias,
+        ultimaAtualizacaoDias: hojeISO,
+        status: novoStatus
+      }).catch(() => {})
+    );
+
+    return { data: { ...c, diasRestantes: novosDias, ultimaAtualizacaoDias: hojeISO, status: novoStatus }, id };
+  });
+
+  if (atualizacoes.length) await Promise.all(atualizacoes);
+  return corrigidos;
+}
+
 async function carregarClientes() {
   let todos = cache.get("clientes");
   if (!todos) {
     const snap = await getDocs(collection(db, "clientes"));
     todos = snap.docs.map(d => ({ data: d.data(), id: d.id }));
+    todos = await aplicarContagemDeDiasEmLote(todos);
     cache.set("clientes", todos);
   }
   return todos;
@@ -351,14 +1046,14 @@ window.ativar = async function(docId) {
   await assertAdmin();
   await updateDoc(doc(db, "clientes", docId), { status: "ativo" });
   cache.del("clientes");
-  listarClientes();
+  recarregarViewAtual();
 };
 
 window.inativar = async function(docId) {
   await assertAdmin();
   await updateDoc(doc(db, "clientes", docId), { status: "inativo" });
   cache.del("clientes");
-  listarClientes();
+  recarregarViewAtual();
 };
 
 
@@ -367,8 +1062,9 @@ window.inativar = async function(docId) {
 ========================================= */
 
 function pegarCodigo() {
-  // Usa o select de UF (não o input digitável)
-  return estadoSelect.value.trim().toUpperCase() + "-" + numeros.map(n => n.value).join("");
+  // Usa o que o usuário digitou no input; se estiver vazio, cai pro select.
+  const uf = (estadoInput.value.trim() || estadoSelect.value.trim()).toUpperCase();
+  return uf + "-" + numeros.map(n => n.value).join("");
 }
 
 window.buscar = async function(btnId) {
@@ -383,7 +1079,9 @@ window.buscar = async function(btnId) {
   lista.innerHTML = "";
 
   if (snap.exists()) {
-    criarCard(snap.data(), snap.id);
+    const corrigidos = await aplicarContagemDeDiasEmLote([{ data: snap.data(), id: snap.id }]);
+    cache.del("clientes");
+    criarCard(corrigidos[0].data, corrigidos[0].id);
   } else {
     lista.innerHTML = "Usuário não encontrado ❌";
   }
@@ -417,7 +1115,56 @@ window.verEmpresas = async function(btnId) {
       return;
     }
 
-    paginar(empresas, ({ data: d, id: eId }) => {
+    const topoAcoes = document.createElement("div");
+    topoAcoes.style.cssText = "display:flex;justify-content:flex-end;margin-bottom:12px;gap:10px;flex-wrap:wrap;";
+    topoAcoes.innerHTML = `
+      <div class="busca-empresa-wrap">
+        <svg class="busca-empresa-icone" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="7"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" id="busca-empresa-input" class="busca-empresa-input" placeholder="Buscar empresa" oninput="filtrarListaEmpresas(this.value)">
+      </div>
+      <button class="btn-acao btn-detalhes" onclick="abrirModalWhatsappClube()">WhatsApp do Clube</button>
+    `;
+    lista.appendChild(topoAcoes);
+
+    const containerEmpresas = document.createElement("div");
+    containerEmpresas.id = "containerListaEmpresas";
+    containerEmpresas.className = "sub-lista";
+    lista.appendChild(containerEmpresas);
+
+    _empresasCacheAtual = empresas;
+    renderizarListaEmpresas(empresas);
+  } catch (e) { console.error(e); lista.innerHTML = "Erro ao carregar ❌"; }
+  restaurarBtnAtivo();
+};
+
+let _empresasCacheAtual = [];
+
+window.filtrarListaEmpresas = function(termo) {
+  const t = (termo || "").trim().toLowerCase();
+  if (!t) { renderizarListaEmpresas(_empresasCacheAtual); return; }
+
+  const filtradas = _empresasCacheAtual.filter(({ data: d, id }) => {
+    const nome = (d.nomeExibicao || d.nome || id || "").toLowerCase();
+    const email = (d.email || "").toLowerCase();
+    return nome.includes(t) || email.includes(t);
+  });
+  renderizarListaEmpresas(filtradas);
+};
+
+function renderizarListaEmpresas(empresas) {
+  const container = document.getElementById("containerListaEmpresas");
+  if (!container) return;
+  container.innerHTML = "";
+
+  if (!empresas.length) {
+    container.innerHTML = "<p style='color:#666;font-size:13px;'>Nenhuma empresa encontrada.</p>";
+    return;
+  }
+
+  renderPaginado(container, empresas, ({ data: d, id: eId }) => {
       const tagB = d.ativarBrinde
         ? '<span class="tag-ativo">● Brinde ativo</span>'
         : '<span class="tag-inativo">● Brinde inativo</span>';
@@ -430,22 +1177,20 @@ window.verEmpresas = async function(btnId) {
       card.style.cssText = "display:flex;align-items:flex-start;gap:10px;flex-wrap:nowrap;";
       card.innerHTML = `
         <div class="info" style="flex:1;min-width:0;">
-          <h3 style="margin:0 0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${d.nome || "Empresa sem nome"}</h3>
+          <h3 style="margin:0 0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${d.nomeExibicao || d.nome || "Empresa sem nome"}</h3>
           <p style="margin:2px 0 4px;color:#aaa;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${d.email || ""}</p>
           <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">${tagB} ${tagS}</div>
           ${d.metaBrinde  ? `<p style="margin:4px 0;font-size:13px"><strong>Meta brinde:</strong> ${d.metaBrinde} compras</p>` : ""}
           ${(d.metaUsosSorteio || d.metaComprasSorteio) ? `<p style="margin:4px 0;font-size:13px"><strong>Usos p/ participar:</strong> ${d.metaUsosSorteio || d.metaComprasSorteio} compras</p>` : ""}
           ${d.metaClientesSorteio ? `<p style="margin:4px 0;font-size:13px"><strong>Meta clientes elegíveis:</strong> ${d.metaClientesSorteio} — ${d.qtdSorteio || 1} ganhador(es)</p>` : ""}
         </div>
-        <div class="acao" style="flex-shrink:0;display:flex;align-items:flex-start;padding-top:2px;">
+        <div class="acao" style="flex-shrink:0;display:flex;flex-direction:column;align-items:stretch;gap:6px;padding-top:2px;">
           <button class="btn-acao btn-config" style="white-space:nowrap;" onclick="abrirConfigEmpresa('${eId}')">⚙ Config</button>
+          <button class="btn-acao btn-detalhes" style="white-space:nowrap;" onclick="abrirRastreamentoEmpresa('${eId}')">Rastreio</button>
         </div>`;
-      lista.appendChild(card);
+      container.appendChild(card);
     });
-
-  } catch (e) { console.error(e); lista.innerHTML = "Erro ao carregar ❌"; }
-  restaurarBtnAtivo();
-};
+}
 
 
 /* =========================================
@@ -597,6 +1342,437 @@ window.salvarConfigEmpresa = async function(eId) {
     fecharPainelConfig();
     verEmpresas();
   } catch (e) { console.error(e); alert("Erro ao salvar ❌"); }
+};
+
+
+/* =========================================
+   📡 RASTREAMENTO — QR Code + Leads por empresa
+   Modelo: 1 número de WhatsApp do CLUBE (geral, não por
+   empresa). Cada empresa só tem um QR Code que pode ser
+   ativado/desativado, e um nome de exibição (com acento)
+   pra mostrar bonito na página pública do lead.
+========================================= */
+
+// Pequeno helper porque IDs de empresa podem ter caracteres especiais
+function cssEscape(str) {
+  return String(str).replace(/[^a-zA-Z0-9_-]/g, "_");
+}
+
+// Base da URL pública que o QR Code aponta. Usa o domínio atual do painel,
+// então funciona tanto em produção quanto em testes locais sem precisar
+// hardcodar um domínio fixo.
+function urlLeadEmpresa(eId) {
+  const base = window.location.origin + window.location.pathname.replace(/admin\.html$/, "");
+  return `${base}lead.html?e=${encodeURIComponent(eId)}`;
+}
+
+let _rastreioEIdAtual = null;
+
+/* ---------- WhatsApp do Clube (configuração geral, 1 número só) ---------- */
+
+window.abrirModalWhatsappClube = async function() {
+  await assertAdmin();
+  const modal = document.getElementById("modalWhatsappClube");
+  modal.classList.remove("hidden");
+
+  const input = document.getElementById("whatsapp-clube-input");
+  input.value = "Carregando...";
+  input.disabled = true;
+
+  try {
+    const snap = await getDoc(doc(db, "configuracoes", "geral"));
+    input.value = snap.exists() ? (snap.data().whatsappClube || "") : "";
+  } catch (e) {
+    console.error(e);
+    input.value = "";
+  }
+  input.disabled = false;
+};
+
+window.fecharModalWhatsappClube = function() {
+  document.getElementById("modalWhatsappClube").classList.add("hidden");
+};
+
+window.salvarWhatsappClube = async function() {
+  await assertAdmin();
+  const input = document.getElementById("whatsapp-clube-input");
+  const numero = input.value.replace(/\D/g, "");
+
+  if (!numero || numero.length < 10) {
+    alert("Digite um número de WhatsApp válido, com DDI+DDD (ex: 5599999999999) ❗");
+    return;
+  }
+
+  await setDoc(doc(db, "configuracoes", "geral"), { whatsappClube: numero }, { merge: true });
+  alert("WhatsApp do Clube salvo ✅\n\nEsse número vai receber os leads de TODAS as empresas.");
+  fecharModalWhatsappClube();
+};
+
+/* ---------- Modal individual de Rastreamento (por empresa) ---------- */
+
+window.abrirRastreamentoEmpresa = async function(eId) {
+  await assertAdmin();
+  _rastreioEIdAtual = eId;
+
+  const modal = document.getElementById("modalRastreamento");
+  modal.classList.remove("hidden");
+  document.getElementById("conteudoRastreamento").innerHTML = "Carregando...";
+
+  await renderizarModalRastreamento(eId);
+};
+
+window.fecharModalRastreamento = function() {
+  document.getElementById("modalRastreamento").classList.add("hidden");
+  _rastreioEIdAtual = null;
+};
+
+async function renderizarModalRastreamento(eId) {
+  const snap = await getDoc(doc(db, "empresas", eId));
+  if (!snap.exists()) {
+    document.getElementById("conteudoRastreamento").innerHTML = "<p>Empresa não encontrada.</p>";
+    return;
+  }
+  const d = snap.data();
+
+  const nomeBase = d.nome || eId;
+  const nomeExibicao = d.nomeExibicao || nomeBase;
+  const ativo = !!d.rastreamentoAtivo;
+  const url = urlLeadEmpresa(eId);
+
+  const comissao = d.comissao || {};
+  const planosComissao = ["Mensal", "Anual"];
+
+  let totalComissaoGeral = 0;
+  const linhasComissao = planosComissao.map(plano => {
+    const c = comissao[plano] || { vendas: 0, percentual: 0 };
+    const vendas = Number(c.vendas || 0);
+    const percentual = Number(c.percentual || 0);
+    const valorPlano = CATALOGO_PLANOS[plano]?.valor || 0;
+    const totalVendido = vendas * valorPlano;
+    const comissaoPlano = totalVendido * (percentual / 100);
+    totalComissaoGeral += comissaoPlano;
+
+    return `
+      <div class="comissao-plano-box">
+        <div class="comissao-plano-topo">
+          <strong>${plano}</strong>
+          <span class="comissao-plano-valor">${moeda(comissaoPlano)}</span>
+        </div>
+
+        <div class="comissao-vendas-atual">
+          <span class="comissao-vendas-atual-num">${vendas}</span>
+          <span class="comissao-vendas-atual-label">venda${vendas === 1 ? "" : "s"} registrada${vendas === 1 ? "" : "s"}</span>
+        </div>
+
+        <div class="comissao-campos-linha">
+          <div class="comissao-campo">
+            <label>Adicionar vendas</label>
+            <input type="number" min="1" id="comissao-add-vendas-${plano}-${cssEscape(eId)}" placeholder="Ex: 4">
+          </div>
+          <button class="btn-acao btn-ativar comissao-btn-somar" onclick="somarVendaComissao('${eId}','${plano}')">Somar</button>
+        </div>
+
+        <div class="comissao-campos-linha" style="margin-top:10px;">
+          <div class="comissao-campo">
+            <label>Comissão (%)</label>
+            <input type="number" min="1" max="99" id="comissao-percentual-${plano}-${cssEscape(eId)}" value="${percentual}">
+          </div>
+          <button class="btn-acao btn-detalhes comissao-btn-somar" onclick="salvarPercentualComissao('${eId}','${plano}')">Salvar %</button>
+        </div>
+
+        <small style="color:#666;font-size:11px;display:block;margin-top:8px;">
+          Total vendido: ${moeda(totalVendido)} (${vendas} × ${moeda(valorPlano)})
+        </small>
+      </div>
+    `;
+  }).join("");
+
+  document.getElementById("conteudoRastreamento").innerHTML = `
+    <div class="form-gerar">
+
+      <div class="rastreio-status-linha">
+        <span>Rastreamento desta empresa:</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="rastreio-toggle-ativo" ${ativo ? "checked" : ""} onchange="alternarRastreamentoEmpresa('${eId}', this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+        <span id="rastreio-status-texto" style="color:${ativo ? '#4caf50' : '#ff5252'};font-weight:700;font-size:12.5px;">${ativo ? "Ativo" : "Inativo"}</span>
+      </div>
+      <small style="color:#666;font-size:11px;display:block;margin:-4px 0 14px;">Quando inativo, o QR Code continua existindo, mas quem escanear vê um aviso de que não está disponível.</small>
+
+      <div class="form-grupo">
+        <label>Nome de exibição (com acento, como deve aparecer pro lead)</label>
+        <input type="text" id="rastreio-nome-exibicao" placeholder="Ex: Academia da Val" value="${sanitize(nomeExibicao)}" maxlength="80">
+        <small style="color:#666;font-size:11px;display:block;margin-top:6px;">O nome do cadastro (${sanitize(nomeBase)}) vem do e-mail e não tem acento — use este campo pra mostrar o nome certo na página do lead.</small>
+        <button class="btn-acao btn-detalhes" style="margin-top:10px;width:100%;" onclick="salvarNomeExibicaoEmpresa('${eId}')">Salvar nome de exibição</button>
+      </div>
+
+    </div>
+
+    <div class="linha" style="margin:18px 0;"></div>
+
+    <div class="rastreio-qr-centro">
+      <div class="rastreio-qr-wrap" id="qr-wrap-${cssEscape(eId)}">
+        <span style="color:#888;font-size:12px;">Gerando QR Code...</span>
+      </div>
+
+      <div class="rastreio-link-linha">
+        <input type="text" readonly value="${sanitize(url)}" onclick="this.select()">
+        <button class="btn-acao btn-detalhes" onclick="copiarLinkRastreamento('${eId}')">Copiar</button>
+      </div>
+
+      <div class="rastreio-acoes">
+        <button class="btn-acao btn-ativar" onclick="baixarQRCode('${eId}','${sanitize(nomeExibicao).replace(/'/g, "\\'")}')">Baixar QR Code</button>
+        <button class="btn-acao btn-detalhes" onclick="verLeadsEmpresa('${eId}','${sanitize(nomeExibicao).replace(/'/g, "\\'")}')">Ver leads</button>
+      </div>
+    </div>
+
+    <div class="linha" style="margin:18px 0;"></div>
+
+    <div class="comissao-bloco">
+      <div class="comissao-cabecalho">
+        <label class="planos-label" style="margin:0;">Comissão da empresa</label>
+        <span class="comissao-total-geral">${moeda(totalComissaoGeral)}</span>
+      </div>
+      <small style="color:#666;font-size:11px;display:block;margin:4px 0 12px;">
+        Defina quantas vendas de cada plano essa empresa trouxe e a porcentagem de comissão dela. O sistema calcula o valor automaticamente.
+      </small>
+
+      ${linhasComissao}
+
+      <button class="btn-acao btn-inativar" style="width:100%;margin-top:10px;" onclick="limparComissaoEmpresa('${eId}')">Limpar dados de comissão</button>
+    </div>
+  `;
+
+  gerarQRCodeEmpresa(eId, url);
+}
+
+// Gera o QR Code como imagem (mais confiável que desenhar em canvas em
+// alguns navegadores/webviews). Se a biblioteca principal não tiver
+// carregado por algum motivo (CDN bloqueado, rede instável), cai para um
+// serviço de imagem externo, e só mostra erro se as duas formas falharem.
+function gerarQRCodeEmpresa(eId, url) {
+  const wrap = document.getElementById(`qr-wrap-${cssEscape(eId)}`);
+  if (!wrap) return;
+
+  function mostrarImagem(src, ehExterno) {
+    wrap.innerHTML = `<img src="${src}" alt="QR Code" ${ehExterno ? 'crossorigin="anonymous"' : ''} style="width:100%;height:100%;object-fit:contain;display:block;" onerror="document.getElementById('qr-wrap-${cssEscape(eId)}').innerHTML='<span style=&quot;color:#ff5252;font-size:12px;text-align:center;&quot;>Não foi possível carregar o QR Code. Verifique sua conexão e reabra esta tela.</span>'">`;
+  }
+
+  function usarFallbackExterno() {
+    // Serviço público de geração de QR Code via imagem direta — usado só
+    // como último recurso, se a biblioteca local não estiver disponível.
+    const src = `https://api.qrserver.com/v1/create-qr-code/?size=380x380&data=${encodeURIComponent(url)}`;
+    mostrarImagem(src, true);
+  }
+
+  if (window.QRCode && typeof QRCode.toDataURL === "function") {
+    QRCode.toDataURL(url, { width: 380, margin: 1, color: { dark: "#000000", light: "#ffffff" } }, (err, dataUrl) => {
+      if (err || !dataUrl) {
+        console.error("Erro ao gerar QR Code localmente, usando fallback:", err);
+        usarFallbackExterno();
+        return;
+      }
+      mostrarImagem(dataUrl, false);
+    });
+  } else {
+    console.warn("Biblioteca QRCode não carregou — usando serviço externo.");
+    usarFallbackExterno();
+  }
+}
+
+window.alternarRastreamentoEmpresa = async function(eId, ativo) {
+  await assertAdmin();
+  await setDoc(doc(db, "empresas", eId), { rastreamentoAtivo: ativo }, { merge: true });
+  cache.del("empresas");
+
+  const texto = document.getElementById("rastreio-status-texto");
+  if (texto) {
+    texto.textContent = ativo ? "Ativo" : "Inativo";
+    texto.style.color = ativo ? "#4caf50" : "#ff5252";
+  }
+};
+
+window.salvarNomeExibicaoEmpresa = async function(eId) {
+  await assertAdmin();
+  const input = document.getElementById("rastreio-nome-exibicao");
+  const nome = input.value.trim();
+
+  if (!nome) { alert("Digite um nome de exibição."); return; }
+
+  await setDoc(doc(db, "empresas", eId), { nomeExibicao: nome }, { merge: true });
+  cache.del("empresas");
+  alert("Nome de exibição salvo.");
+};
+
+/* ---------- Comissão por empresa (manual, por plano) ---------- */
+
+/* ---------- Comissão por empresa (manual, por plano) ---------- */
+
+// Soma a quantidade digitada de vendas ao total já registrado daquele
+// plano. Nunca substitui — sempre acumula em cima do que já existia,
+// pra refletir vendas novas indicadas pela empresa ao longo do tempo.
+window.somarVendaComissao = async function(eId, plano) {
+  await assertAdmin();
+  const inputAdd = document.getElementById(`comissao-add-vendas-${plano}-${cssEscape(eId)}`);
+  const qtdAdicionar = parseInt(inputAdd.value, 10);
+
+  if (!qtdAdicionar || qtdAdicionar < 1) { alert("Informe uma quantidade de vendas válida (ex: 1, 4, 10)."); return; }
+
+  const snap = await getDoc(doc(db, "empresas", eId));
+  const comissaoAtual = snap.exists() ? (snap.data().comissao || {}) : {};
+  const vendasAtuais = Number(comissaoAtual[plano]?.vendas || 0);
+  const percentualAtual = Number(comissaoAtual[plano]?.percentual || 0);
+
+  comissaoAtual[plano] = {
+    vendas: vendasAtuais + qtdAdicionar,
+    percentual: percentualAtual
+  };
+
+  await setDoc(doc(db, "empresas", eId), { comissao: comissaoAtual }, { merge: true });
+  cache.del("empresas");
+  await renderizarModalRastreamento(eId);
+};
+
+// Salva só a porcentagem de comissão daquele plano, sem alterar as vendas
+// já registradas.
+window.salvarPercentualComissao = async function(eId, plano) {
+  await assertAdmin();
+  const inputPercentual = document.getElementById(`comissao-percentual-${plano}-${cssEscape(eId)}`);
+  const percentual = parseFloat(inputPercentual.value);
+
+  if (isNaN(percentual) || percentual < 1 || percentual > 99) { alert("A comissão deve ser entre 1% e 99%."); return; }
+
+  const snap = await getDoc(doc(db, "empresas", eId));
+  const comissaoAtual = snap.exists() ? (snap.data().comissao || {}) : {};
+  const vendasAtuais = Number(comissaoAtual[plano]?.vendas || 0);
+
+  comissaoAtual[plano] = { vendas: vendasAtuais, percentual };
+
+  await setDoc(doc(db, "empresas", eId), { comissao: comissaoAtual }, { merge: true });
+  cache.del("empresas");
+  await renderizarModalRastreamento(eId);
+};
+
+// Zera vendas e comissão acumulada dessa empresa — usar depois de já ter
+// pago a comissão pra ela, pra começar a contar um novo ciclo do zero.
+window.limparComissaoEmpresa = async function(eId) {
+  await assertAdmin();
+  if (!confirm("Confirma limpar os dados de comissão desta empresa?\n\nIsso vai zerar as vendas e a comissão acumulada de todos os planos. Use depois de já ter pago a comissão pra ela.")) return;
+
+  await setDoc(doc(db, "empresas", eId), { comissao: {} }, { merge: true });
+  cache.del("empresas");
+  await renderizarModalRastreamento(eId);
+  alert("Dados de comissão limpos.");
+};
+
+window.copiarLinkRastreamento = async function(eId) {
+  const url = urlLeadEmpresa(eId);
+  try {
+    await navigator.clipboard.writeText(url);
+    alert("Link copiado ✅");
+  } catch (_) {
+    alert(`Copie manualmente:\n\n${url}`);
+  }
+};
+
+window.baixarQRCode = async function(eId, nomeEmpresa) {
+  const wrap = document.getElementById(`qr-wrap-${cssEscape(eId)}`);
+  const img = wrap ? wrap.querySelector("img") : null;
+
+  if (!img || !img.src) {
+    alert("QR Code ainda não carregou, aguarde um instante e tente de novo.");
+    return;
+  }
+
+  const nomeArquivo = (nomeEmpresa || eId).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, "-").toLowerCase();
+  const nomeFinal = `qrcode-${nomeArquivo || eId}.png`;
+
+  // Quando a imagem já é um data URL (gerada localmente), basta baixar direto.
+  if (img.src.startsWith("data:")) {
+    const link = document.createElement("a");
+    link.download = nomeFinal;
+    link.href = img.src;
+    link.click();
+    return;
+  }
+
+  // Quando vem do serviço externo (fallback), busca a imagem e converte
+  // pra blob antes de baixar — só usar img.src direto abriria a URL numa
+  // aba nova em vez de baixar o arquivo, em vários navegadores/webviews.
+  try {
+    const resp = await fetch(img.src);
+    const blob = await resp.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.download = nomeFinal;
+    link.href = blobUrl;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 4000);
+  } catch (e) {
+    console.error("Erro ao baixar QR Code:", e);
+    alert("Não foi possível baixar agora. Toque e segure a imagem do QR Code para salvar manualmente.");
+  }
+};
+
+/* =========================================
+   📡 LEADS DE UMA EMPRESA
+========================================= */
+
+window.verLeadsEmpresa = async function(eId, nomeEmpresa) {
+  fecharModalRastreamento();
+  lista.innerHTML = "Carregando leads...";
+  fecharPainelConfig();
+
+  try {
+    const snap = await getDocs(query(collection(db, "leads"), where("empresa", "==", eId)));
+
+    lista.innerHTML = "";
+
+    const voltar = document.createElement("button");
+    voltar.className = "btn-voltar-inline";
+    voltar.textContent = "← Voltar";
+    voltar.onclick = () => verEmpresas("btn-empresas");
+    lista.appendChild(voltar);
+
+    const titulo = document.createElement("p");
+    titulo.className = "secao-titulo";
+    titulo.textContent = ` Leads de ${sanitize(nomeEmpresa || eId)}`;
+    lista.appendChild(titulo);
+
+    let leads = snap.docs.map(d => d.data());
+    // Ordena do mais recente para o mais antigo
+    leads.sort((a, b) => {
+      const ta = a.criadoEm?.seconds || 0;
+      const tb = b.criadoEm?.seconds || 0;
+      return tb - ta;
+    });
+
+    if (!leads.length) {
+      const p = document.createElement("p");
+      p.style.cssText = "color:#666;font-size:13px;margin-top:16px";
+      p.textContent = "Nenhum lead capturado por essa empresa ainda.";
+      lista.appendChild(p);
+      return;
+    }
+
+    const contagem = document.createElement("p");
+    contagem.style.cssText = "color:#888;font-size:12.5px;margin:-6px 0 14px;";
+    contagem.textContent = `${leads.length} lead${leads.length > 1 ? "s" : ""} capturado${leads.length > 1 ? "s" : ""}`;
+    lista.appendChild(contagem);
+
+    renderPaginado(lista, leads, (l) => {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `
+        <div class="info">
+          <h3 style="margin:0 0 4px;">${sanitize(l.nome)}</h3>
+          <p style="color:rgba(255,215,0,0.6);font-size:11px;margin-top:4px;"> ${sanitize(l.data || "--")} às ${sanitize(l.hora || "--")}</p>
+        </div>`;
+      lista.appendChild(card);
+    });
+
+  } catch (e) { console.error(e); lista.innerHTML = "Erro ao carregar leads ❌"; }
 };
 
 
