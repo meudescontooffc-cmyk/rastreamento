@@ -1444,12 +1444,21 @@ async function renderizarModalRastreamento(eId) {
 
   let totalComissaoGeral = 0;
   const linhasComissao = planosComissao.map(plano => {
-    const c = comissao[plano] || { vendas: 0, percentual: 0 };
+    const c = comissao[plano] || { vendas: 0, percentual: 0, isentas: 0 };
     const vendas = Number(c.vendas || 0);
     const percentual = Number(c.percentual || 0);
+    const isentas = Number(c.isentas || 0);
     const valorPlano = CATALOGO_PLANOS[plano]?.valor || 0;
+
+    // Só comissiona o que passar do número de vendas isentas configurado
+    // pra essa empresa nesse plano. Ex.: 10 isentas, 12 vendas → comissão
+    // calculada em cima de só 2 vendas.
+    const vendasComissionaveis = Math.max(0, vendas - isentas);
+    const faltamParaComissionar = Math.max(0, isentas - vendas);
+
     const totalVendido = vendas * valorPlano;
-    const comissaoPlano = totalVendido * (percentual / 100);
+    const totalComissionavel = vendasComissionaveis * valorPlano;
+    const comissaoPlano = totalComissionavel * (percentual / 100);
     totalComissaoGeral += comissaoPlano;
 
     return `
@@ -1464,12 +1473,24 @@ async function renderizarModalRastreamento(eId) {
           <span class="comissao-vendas-atual-label">venda${vendas === 1 ? "" : "s"} registrada${vendas === 1 ? "" : "s"}</span>
         </div>
 
+        ${faltamParaComissionar > 0
+          ? `<small class="comissao-aviso-isencao">Faltam ${faltamParaComissionar} venda${faltamParaComissionar === 1 ? "" : "s"} sem comissão antes dela começar a comissionar.</small>`
+          : `<small class="comissao-aviso-comissionando">Comissionando sobre ${vendasComissionaveis} venda${vendasComissionaveis === 1 ? "" : "s"} (${vendas} vendidas − ${isentas} isentas).</small>`}
+
         <div class="comissao-campos-linha">
           <div class="comissao-campo">
             <label>Adicionar vendas</label>
             <input type="number" min="1" id="comissao-add-vendas-${plano}-${cssEscape(eId)}" placeholder="Ex: 4">
           </div>
           <button class="btn-acao btn-ativar comissao-btn-somar" onclick="somarVendaComissao('${eId}','${plano}')">Somar</button>
+        </div>
+
+        <div class="comissao-campos-linha" style="margin-top:10px;">
+          <div class="comissao-campo">
+            <label>Vendas isentas (sem comissão)</label>
+            <input type="number" min="0" id="comissao-isentas-${plano}-${cssEscape(eId)}" value="${isentas}">
+          </div>
+          <button class="btn-acao btn-detalhes comissao-btn-somar" onclick="salvarIsentasComissao('${eId}','${plano}')">Salvar</button>
         </div>
 
         <div class="comissao-campos-linha" style="margin-top:10px;">
@@ -1481,7 +1502,7 @@ async function renderizarModalRastreamento(eId) {
         </div>
 
         <small style="color:#666;font-size:11px;display:block;margin-top:8px;">
-          Total vendido: ${moeda(totalVendido)} (${vendas} × ${moeda(valorPlano)})
+          Total vendido: ${moeda(totalVendido)} · Comissionável: ${moeda(totalComissionavel)}
         </small>
       </div>
     `;
@@ -1512,18 +1533,14 @@ async function renderizarModalRastreamento(eId) {
     <div class="linha" style="margin:18px 0;"></div>
 
     <div class="rastreio-qr-centro">
-      <div class="rastreio-qr-wrap" id="qr-wrap-${cssEscape(eId)}">
-        <span style="color:#888;font-size:12px;">Gerando QR Code...</span>
-      </div>
-
+      <label class="planos-label" style="align-self:flex-start;margin:0 0 -4px;">Link de captação</label>
       <div class="rastreio-link-linha">
         <input type="text" readonly value="${sanitize(url)}" onclick="this.select()">
         <button class="btn-acao btn-detalhes" onclick="copiarLinkRastreamento('${eId}')">Copiar</button>
       </div>
 
       <div class="rastreio-acoes">
-        <button class="btn-acao btn-ativar" onclick="baixarQRCode('${eId}','${sanitize(nomeExibicao).replace(/'/g, "\\'")}')">Baixar QR Code</button>
-        <button class="btn-acao btn-detalhes" onclick="verLeadsEmpresa('${eId}','${sanitize(nomeExibicao).replace(/'/g, "\\'")}')">Ver leads</button>
+        <button class="btn-acao btn-detalhes" style="width:100%;" onclick="verLeadsEmpresa('${eId}','${sanitize(nomeExibicao).replace(/'/g, "\\'")}')">Ver leads</button>
       </div>
     </div>
 
@@ -1543,42 +1560,6 @@ async function renderizarModalRastreamento(eId) {
       <button class="btn-acao btn-inativar" style="width:100%;margin-top:10px;" onclick="limparComissaoEmpresa('${eId}')">Limpar dados de comissão</button>
     </div>
   `;
-
-  gerarQRCodeEmpresa(eId, url);
-}
-
-// Gera o QR Code como imagem (mais confiável que desenhar em canvas em
-// alguns navegadores/webviews). Se a biblioteca principal não tiver
-// carregado por algum motivo (CDN bloqueado, rede instável), cai para um
-// serviço de imagem externo, e só mostra erro se as duas formas falharem.
-function gerarQRCodeEmpresa(eId, url) {
-  const wrap = document.getElementById(`qr-wrap-${cssEscape(eId)}`);
-  if (!wrap) return;
-
-  function mostrarImagem(src, ehExterno) {
-    wrap.innerHTML = `<img src="${src}" alt="QR Code" ${ehExterno ? 'crossorigin="anonymous"' : ''} style="width:100%;height:100%;object-fit:contain;display:block;" onerror="document.getElementById('qr-wrap-${cssEscape(eId)}').innerHTML='<span style=&quot;color:#ff5252;font-size:12px;text-align:center;&quot;>Não foi possível carregar o QR Code. Verifique sua conexão e reabra esta tela.</span>'">`;
-  }
-
-  function usarFallbackExterno() {
-    // Serviço público de geração de QR Code via imagem direta — usado só
-    // como último recurso, se a biblioteca local não estiver disponível.
-    const src = `https://api.qrserver.com/v1/create-qr-code/?size=380x380&data=${encodeURIComponent(url)}`;
-    mostrarImagem(src, true);
-  }
-
-  if (window.QRCode && typeof QRCode.toDataURL === "function") {
-    QRCode.toDataURL(url, { width: 380, margin: 1, color: { dark: "#000000", light: "#ffffff" } }, (err, dataUrl) => {
-      if (err || !dataUrl) {
-        console.error("Erro ao gerar QR Code localmente, usando fallback:", err);
-        usarFallbackExterno();
-        return;
-      }
-      mostrarImagem(dataUrl, false);
-    });
-  } else {
-    console.warn("Biblioteca QRCode não carregou — usando serviço externo.");
-    usarFallbackExterno();
-  }
 }
 
 window.alternarRastreamentoEmpresa = async function(eId, ativo) {
@@ -1623,11 +1604,35 @@ window.somarVendaComissao = async function(eId, plano) {
   const comissaoAtual = snap.exists() ? (snap.data().comissao || {}) : {};
   const vendasAtuais = Number(comissaoAtual[plano]?.vendas || 0);
   const percentualAtual = Number(comissaoAtual[plano]?.percentual || 0);
+  const isentasAtual = Number(comissaoAtual[plano]?.isentas || 0);
 
   comissaoAtual[plano] = {
     vendas: vendasAtuais + qtdAdicionar,
-    percentual: percentualAtual
+    percentual: percentualAtual,
+    isentas: isentasAtual
   };
+
+  await setDoc(doc(db, "empresas", eId), { comissao: comissaoAtual }, { merge: true });
+  cache.del("empresas");
+  await renderizarModalRastreamento(eId);
+};
+
+// Define quantas vendas dessa empresa, nesse plano, ficam sem comissão
+// antes dela começar a comissionar de fato (ex.: as 10 primeiras vendas
+// não geram comissão, só a partir da 11ª).
+window.salvarIsentasComissao = async function(eId, plano) {
+  await assertAdmin();
+  const inputIsentas = document.getElementById(`comissao-isentas-${plano}-${cssEscape(eId)}`);
+  const isentas = parseInt(inputIsentas.value, 10);
+
+  if (isNaN(isentas) || isentas < 0) { alert("Informe uma quantidade de vendas isentas válida (0 ou mais)."); return; }
+
+  const snap = await getDoc(doc(db, "empresas", eId));
+  const comissaoAtual = snap.exists() ? (snap.data().comissao || {}) : {};
+  const vendasAtuais = Number(comissaoAtual[plano]?.vendas || 0);
+  const percentualAtual = Number(comissaoAtual[plano]?.percentual || 0);
+
+  comissaoAtual[plano] = { vendas: vendasAtuais, percentual: percentualAtual, isentas };
 
   await setDoc(doc(db, "empresas", eId), { comissao: comissaoAtual }, { merge: true });
   cache.del("empresas");
@@ -1646,8 +1651,9 @@ window.salvarPercentualComissao = async function(eId, plano) {
   const snap = await getDoc(doc(db, "empresas", eId));
   const comissaoAtual = snap.exists() ? (snap.data().comissao || {}) : {};
   const vendasAtuais = Number(comissaoAtual[plano]?.vendas || 0);
+  const isentasAtual = Number(comissaoAtual[plano]?.isentas || 0);
 
-  comissaoAtual[plano] = { vendas: vendasAtuais, percentual };
+  comissaoAtual[plano] = { vendas: vendasAtuais, percentual, isentas: isentasAtual };
 
   await setDoc(doc(db, "empresas", eId), { comissao: comissaoAtual }, { merge: true });
   cache.del("empresas");
@@ -1673,45 +1679,6 @@ window.copiarLinkRastreamento = async function(eId) {
     alert("Link copiado ✅");
   } catch (_) {
     alert(`Copie manualmente:\n\n${url}`);
-  }
-};
-
-window.baixarQRCode = async function(eId, nomeEmpresa) {
-  const wrap = document.getElementById(`qr-wrap-${cssEscape(eId)}`);
-  const img = wrap ? wrap.querySelector("img") : null;
-
-  if (!img || !img.src) {
-    alert("QR Code ainda não carregou, aguarde um instante e tente de novo.");
-    return;
-  }
-
-  const nomeArquivo = (nomeEmpresa || eId).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, "-").toLowerCase();
-  const nomeFinal = `qrcode-${nomeArquivo || eId}.png`;
-
-  // Quando a imagem já é um data URL (gerada localmente), basta baixar direto.
-  if (img.src.startsWith("data:")) {
-    const link = document.createElement("a");
-    link.download = nomeFinal;
-    link.href = img.src;
-    link.click();
-    return;
-  }
-
-  // Quando vem do serviço externo (fallback), busca a imagem e converte
-  // pra blob antes de baixar — só usar img.src direto abriria a URL numa
-  // aba nova em vez de baixar o arquivo, em vários navegadores/webviews.
-  try {
-    const resp = await fetch(img.src);
-    const blob = await resp.blob();
-    const blobUrl = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.download = nomeFinal;
-    link.href = blobUrl;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 4000);
-  } catch (e) {
-    console.error("Erro ao baixar QR Code:", e);
-    alert("Não foi possível baixar agora. Toque e segure a imagem do QR Code para salvar manualmente.");
   }
 };
 
