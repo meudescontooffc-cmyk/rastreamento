@@ -505,7 +505,7 @@ const CATALOGO_PLANOS = {
   "mensal-digital": { label: "Mensal Digital", dias: 30,  valor: 9.99,   modalidade: "digital" },
   "mensal-fisico":  { label: "Mensal Físico",  dias: 30,  valor: 14.99,  modalidade: "fisico" },
   "mensal-hibrido": { label: "Mensal Híbrido", dias: 30,  valor: 19.99,  modalidade: "hibrido" },
-  "anual":          { label: "Anual",          dias: 365, valor: 149.90 },
+  "anual":          { label: "Anual",          dias: 365, valor: 109.99 },
   "pendente":       { label: "Pendente",       dias: 0,   valor: 0 }
 };
 
