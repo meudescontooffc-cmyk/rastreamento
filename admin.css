@@ -1032,6 +1032,15 @@ h2 {
   color: #aaa;
 }
 
+.plano-subtitulo {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #888;
+  margin-bottom: 6px;
+}
+
 /* Upload de foto */
 .foto-upload-wrap {
   display: flex;
@@ -1211,6 +1220,59 @@ h2 {
   color: #ccc;
   margin-bottom: 8px;
   letter-spacing: 0.02em;
+}
+
+.planos-cartao-digital {
+  padding: 2px 0;
+}
+
+.cartao-toggle-linha {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #141414;
+  border: 1px solid rgba(255,215,0,0.15);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.cartao-toggle-status {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.cartao-toggle-switch {
+  flex-shrink: 0;
+  width: 46px;
+  height: 26px;
+  border-radius: 20px;
+  background: #333;
+  border: 1px solid rgba(255,255,255,0.1);
+  position: relative;
+  cursor: pointer;
+  padding: 0;
+  transition: 0.2s;
+}
+
+.cartao-toggle-switch.ligado {
+  background: linear-gradient(135deg, #b8730a, #d4af37);
+  border-color: rgba(255,215,0,0.4);
+}
+
+.cartao-toggle-bolinha {
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: #eee;
+  transition: 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+}
+
+.cartao-toggle-switch.ligado .cartao-toggle-bolinha {
+  left: 22px;
+  background: #111;
 }
 
 .planos-grid-info {

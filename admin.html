@@ -152,12 +152,31 @@
         </div>
 
         <div class="form-grupo">
+          <label>Cidade</label>
+          <input type="text" id="gc-cidade" placeholder="Ex: Itapecuru Mirim" maxlength="80">
+        </div>
+
+        <div class="form-grupo">
           <label>Plano</label>
+
+          <div class="plano-subtitulo">Mensal</div>
           <div class="plano-opcoes plano-opcoes-3">
-            <button type="button" class="plano-btn" id="plano-mensal" onclick="selecionarPlano('mensal')">
-              <span class="plano-nome">Mensal</span>
-              <span class="plano-preco">R$ 19,90</span>
+            <button type="button" class="plano-btn" id="plano-mensal-digital" onclick="selecionarPlano('mensal-digital')">
+              <span class="plano-nome">Digital</span>
+              <span class="plano-preco">R$ 9,99</span>
             </button>
+            <button type="button" class="plano-btn" id="plano-mensal-fisico" onclick="selecionarPlano('mensal-fisico')">
+              <span class="plano-nome">Físico</span>
+              <span class="plano-preco">R$ 14,99</span>
+            </button>
+            <button type="button" class="plano-btn" id="plano-mensal-hibrido" onclick="selecionarPlano('mensal-hibrido')">
+              <span class="plano-nome">Híbrido</span>
+              <span class="plano-preco">R$ 19,99</span>
+            </button>
+          </div>
+
+          <div class="plano-subtitulo" style="margin-top:10px;">Outros</div>
+          <div class="plano-opcoes">
             <button type="button" class="plano-btn" id="plano-anual" onclick="selecionarPlano('anual')">
               <span class="plano-nome">Anual</span>
               <span class="plano-preco">R$ 149,90</span>
@@ -167,6 +186,7 @@
               <span class="plano-preco">0 dias</span>
             </button>
           </div>
+
           <small id="plano-pendente-aviso" class="plano-aviso hidden">
             Gera o ID do cliente sem dias e <strong>inativo</strong>. Use quando o pagamento (Pix/Cartão) será feito depois, pelo site de pagamento. Ative manualmente após a confirmação.
           </small>

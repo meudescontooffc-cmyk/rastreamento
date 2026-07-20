@@ -295,6 +295,7 @@ function abrirModalGerar() {
   document.getElementById("gc-nome").value = "";
   document.getElementById("gc-nascimento").value = "";
   document.getElementById("gc-telefone").value = "";
+  document.getElementById("gc-cidade").value = "";
   document.getElementById("gc-uf").value = "";
   document.getElementById("gc-foto-link").value = "";
   document.getElementById("gc-foto-preview").src = "";
@@ -382,13 +383,15 @@ window.confirmarGerarCodigo = async function() {
   const nome       = document.getElementById("gc-nome").value.trim().slice(0, 100);
   const nascimento = document.getElementById("gc-nascimento").value.trim();
   const telefone   = document.getElementById("gc-telefone").value.trim();
+  const cidade     = document.getElementById("gc-cidade").value.trim().slice(0, 80);
   const uf         = document.getElementById("gc-uf").value.trim().toUpperCase();
   const fotoLink   = document.getElementById("gc-foto-link").value.trim();
 
   if (!nome)             { alert("Informe o nome do cliente ❗"); return; }
   if (!nascimento)       { alert("Informe a data de nascimento ❗"); return; }
   if (!telefone)         { alert("Informe o telefone ❗"); return; }
-  if (!_planoSelecionado){ alert("Selecione um plano (Mensal, Anual ou Pendente) ❗"); return; }
+  if (!cidade)           { alert("Informe a cidade ❗"); return; }
+  if (!_planoSelecionado){ alert("Selecione um plano ❗"); return; }
   if (!uf)               { alert("Selecione a UF ❗"); return; }
 
   const btnConfirmar = document.querySelector(".btn-gerar-confirmar");
@@ -405,14 +408,13 @@ window.confirmarGerarCodigo = async function() {
       if (!snap.exists()) { codigo = tentativa; break; }
     }
 
-    let planoInfo;
-    if (_planoSelecionado === "anual") {
-      planoInfo = { plano: "Anual",  valorPlano: CATALOGO_PLANOS.Anual.valor, dias: CATALOGO_PLANOS.Anual.dias };
-    } else if (_planoSelecionado === "pendente") {
-      planoInfo = { plano: "Pendente", valorPlano: CATALOGO_PLANOS.Pendente.valor, dias: CATALOGO_PLANOS.Pendente.dias };
-    } else {
-      planoInfo = { plano: "Mensal", valorPlano: CATALOGO_PLANOS.Mensal.valor,  dias: CATALOGO_PLANOS.Mensal.dias };
-    }
+    const planoCatalogo = CATALOGO_PLANOS[_planoSelecionado];
+    const planoInfo = {
+      plano: planoCatalogo.label,
+      valorPlano: planoCatalogo.valor,
+      dias: planoCatalogo.dias,
+      modalidade: planoCatalogo.modalidade || null
+    };
 
     // Plano "Pendente" (neutro) nasce inativo: ID existe, mas só ativa
     // depois que o pagamento (Pix/Cartão) for confirmado no site de pagamento.
@@ -431,7 +433,9 @@ window.confirmarGerarCodigo = async function() {
       foto: fotoLink,
       nascimento,
       telefone,
+      cidade,
       plano: planoInfo.plano,
+      modalidade: planoInfo.modalidade,
       valorPlano: planoInfo.valorPlano,
       diasRestantes: planoInfo.dias,
       historicoPlanos,
@@ -439,6 +443,8 @@ window.confirmarGerarCodigo = async function() {
       // Usado para diferenciar "nunca pagou" (não aparece em Pendentes de pagamento)
       // de "já pagou e venceu" (aparece em Pendentes, precisa renovar).
       pagamentoIniciado: _planoSelecionado !== "pendente",
+      // Cartão digital vem ativo por padrão; pode ser desativado depois em "Planos".
+      cartaoDigitalAtivo: true,
       // Referência inicial da contagem automática de dias (1 dia descontado por dia corrido).
       ultimaAtualizacaoDias: dataDeHojeISO(),
       criadoEm: serverTimestamp()
@@ -496,14 +502,26 @@ function criarCard(c, docId) {
 
 // Catálogo único de planos — usado aqui e no modal "Gerar Código"
 const CATALOGO_PLANOS = {
-  Mensal:    { dias: 30,  valor: 19.90 },
-  Anual:     { dias: 365, valor: 149.90 },
-  Pendente:  { dias: 0,   valor: 0 }
+  "mensal-digital": { label: "Mensal Digital", dias: 30,  valor: 9.99,   modalidade: "digital" },
+  "mensal-fisico":  { label: "Mensal Físico",  dias: 30,  valor: 14.99,  modalidade: "fisico" },
+  "mensal-hibrido": { label: "Mensal Híbrido", dias: 30,  valor: 19.99,  modalidade: "hibrido" },
+  "anual":          { label: "Anual",          dias: 365, valor: 149.90 },
+  "pendente":       { label: "Pendente",       dias: 0,   valor: 0 }
 };
 
 let _planosDocIdAtual = null;
 let _planosOriginal   = null; // snapshot do que está salvo no Firebase
 let _planosSimulado   = null; // edição em andamento, ainda não salva
+
+// Encontra a chave (slug) do catálogo a partir do nome salvo no Firestore.
+// Clientes antigos podem ter "Mensal" salvo (antes dos planos Digital/Físico/Híbrido) —
+// nesse caso caímos no "mensal-digital" só para ter uma seleção visual coerente.
+function slugFromLabel(label) {
+  const entry = Object.entries(CATALOGO_PLANOS).find(([, v]) => v.label === label);
+  if (entry) return entry[0];
+  if (label === "Mensal") return "mensal-digital";
+  return null;
+}
 
 function formatarDataHist(ts) {
   let d;
@@ -574,8 +592,11 @@ async function carregarESimularPlanos(docId) {
   _planosOriginal = c;
   _planosSimulado = {
     plano: c.plano || "Mensal",
+    planoSlug: slugFromLabel(c.plano || "Mensal"),
+    modalidade: c.modalidade || null,
     diasRestantes: Number(c.diasRestantes || 0),
-    trocouPlano: false // só vira true se o admin clicar em algum dos 3 planos
+    cartaoDigitalAtivo: c.cartaoDigitalAtivo !== false, // default true se nunca definido
+    trocouPlano: false // só vira true se o admin clicar em algum dos planos
   };
 
   renderizarModalPlanos();
@@ -598,8 +619,9 @@ function renderizarModalPlanos() {
   // Valores SIMULADOS (o que vai ser salvo se clicar em "Salvar alterações")
   const planoSim = sim.plano;
   const diasSim  = sim.diasRestantes;
+  const cartaoAtivoAtual = c.cartaoDigitalAtivo !== false;
 
-  const houveMudanca = planoSim !== planoAtual || diasSim !== diasAtuais;
+  const houveMudanca = planoSim !== planoAtual || diasSim !== diasAtuais || sim.cartaoDigitalAtivo !== cartaoAtivoAtual;
 
   // Soma geral de todos os dias já adquiridos no histórico (caso tenha comprado várias vezes)
   const diasTotaisComprados = hist.reduce((soma, h) => soma + Number(h.dias || 0), 0);
@@ -649,21 +671,59 @@ function renderizarModalPlanos() {
 
     <div class="planos-trocar">
       <label class="planos-label">Trocar plano <span style="color:#777;font-weight:400;">(simulação — só aplica ao salvar)</span></label>
+
+      <div class="plano-subtitulo">Mensal</div>
       <div class="plano-opcoes plano-opcoes-3">
-        <button type="button" class="plano-btn ${planoSim === 'Mensal' ? 'selecionado' : ''}" onclick="simularPlanoCliente('Mensal')">
-          <span class="plano-nome">Mensal</span>
+        <button type="button" class="plano-btn ${planoSim === 'Mensal Digital' ? 'selecionado' : ''}" onclick="simularPlanoCliente('mensal-digital')">
+          <span class="plano-nome">Digital</span>
           <span class="plano-preco">+30 dias</span>
         </button>
-        <button type="button" class="plano-btn ${planoSim === 'Anual' ? 'selecionado' : ''}" onclick="simularPlanoCliente('Anual')">
+        <button type="button" class="plano-btn ${planoSim === 'Mensal Físico' ? 'selecionado' : ''}" onclick="simularPlanoCliente('mensal-fisico')">
+          <span class="plano-nome">Físico</span>
+          <span class="plano-preco">+30 dias</span>
+        </button>
+        <button type="button" class="plano-btn ${planoSim === 'Mensal Híbrido' ? 'selecionado' : ''}" onclick="simularPlanoCliente('mensal-hibrido')">
+          <span class="plano-nome">Híbrido</span>
+          <span class="plano-preco">+30 dias</span>
+        </button>
+      </div>
+
+      <div class="plano-subtitulo" style="margin-top:10px;">Outros</div>
+      <div class="plano-opcoes">
+        <button type="button" class="plano-btn ${planoSim === 'Anual' ? 'selecionado' : ''}" onclick="simularPlanoCliente('anual')">
           <span class="plano-nome">Anual</span>
           <span class="plano-preco">+365 dias</span>
         </button>
-        <button type="button" class="plano-btn plano-btn-neutro ${planoSim === 'Pendente' ? 'selecionado' : ''}" onclick="simularPlanoCliente('Pendente')">
+        <button type="button" class="plano-btn plano-btn-neutro ${planoSim === 'Pendente' ? 'selecionado' : ''}" onclick="simularPlanoCliente('pendente')">
           <span class="plano-nome">Pendente</span>
           <span class="plano-preco">+0 dias</span>
         </button>
       </div>
+
       <small style="display:block;margin-top:6px;font-size:11px;color:#777;">Clicar só pré-visualiza. Soma os dias do plano escolhido aos dias restantes atuais — nada é salvo até clicar em "Salvar alterações".</small>
+    </div>
+
+    <div class="linha" style="margin:16px 0;"></div>
+
+    <div class="planos-cartao-digital">
+      <label class="planos-label">Cartão digital</label>
+      <div class="cartao-toggle-linha">
+        <div>
+          <span class="cartao-toggle-status" style="color:${sim.cartaoDigitalAtivo ? '#4caf50' : '#ff5252'}">
+            ${sim.cartaoDigitalAtivo ? "Ativo" : "Desativado"}
+          </span>
+          <small style="display:block;font-size:11px;color:#777;margin-top:2px;">
+            ${sim.cartaoDigitalAtivo
+              ? 'O botão "Meu cartão" aparece no perfil do cliente.'
+              : 'O botão "Meu cartão" fica oculto no perfil do cliente.'}
+          </small>
+        </div>
+        <button type="button"
+          class="cartao-toggle-switch ${sim.cartaoDigitalAtivo ? 'ligado' : ''}"
+          onclick="toggleCartaoDigitalSimulado()" aria-label="Ativar ou desativar cartão digital">
+          <span class="cartao-toggle-bolinha"></span>
+        </button>
+      </div>
     </div>
 
     <div class="linha" style="margin:16px 0;"></div>
@@ -714,15 +774,23 @@ function renderizarModalPlanos() {
 // Clicar num plano só atualiza a simulação em memória — NADA é salvo ainda.
 // Some os dias do plano clicado ao saldo simulado atual (não ao saldo salvo),
 // assim dá pra simular várias trocas em sequência antes de salvar.
-window.simularPlanoCliente = function(novoPlano) {
+window.simularPlanoCliente = function(novoPlanoSlug) {
   if (!_planosSimulado) return;
-  const info = CATALOGO_PLANOS[novoPlano];
+  const info = CATALOGO_PLANOS[novoPlanoSlug];
   if (!info) return;
 
-  _planosSimulado.plano = novoPlano;
+  _planosSimulado.plano = info.label;
+  _planosSimulado.planoSlug = novoPlanoSlug;
+  _planosSimulado.modalidade = info.modalidade || null;
   _planosSimulado.diasRestantes = _planosSimulado.diasRestantes + info.dias;
   _planosSimulado.trocouPlano = true;
 
+  renderizarModalPlanos();
+};
+
+window.toggleCartaoDigitalSimulado = function() {
+  if (!_planosSimulado) return;
+  _planosSimulado.cartaoDigitalAtivo = !_planosSimulado.cartaoDigitalAtivo;
   renderizarModalPlanos();
 };
 
@@ -751,7 +819,10 @@ window.cancelarSimulacaoPlanos = function() {
   if (!_planosOriginal) return;
   _planosSimulado = {
     plano: _planosOriginal.plano || "Mensal",
+    planoSlug: slugFromLabel(_planosOriginal.plano || "Mensal"),
+    modalidade: _planosOriginal.modalidade || null,
     diasRestantes: Number(_planosOriginal.diasRestantes || 0),
+    cartaoDigitalAtivo: _planosOriginal.cartaoDigitalAtivo !== false,
     trocouPlano: false
   };
   renderizarModalPlanos();
@@ -764,9 +835,9 @@ window.salvarPlanosCliente = async function() {
 
   const c   = _planosOriginal;
   const sim = _planosSimulado;
-  const info = CATALOGO_PLANOS[sim.plano];
+  const info = CATALOGO_PLANOS[sim.planoSlug];
 
-  if (!confirm(`Confirma salvar as alterações?\n\nPlano: ${sim.plano}\nDias restantes: ${sim.diasRestantes}`)) return;
+  if (!confirm(`Confirma salvar as alterações?\n\nPlano: ${sim.plano}\nDias restantes: ${sim.diasRestantes}\nCartão digital: ${sim.cartaoDigitalAtivo ? "Ativo" : "Desativado"}`)) return;
 
   const hist = Array.isArray(c.historicoPlanos) ? c.historicoPlanos : [];
   // Só registra no histórico de pagamento se o admin realmente trocou de plano
@@ -780,12 +851,16 @@ window.salvarPlanosCliente = async function() {
     plano: sim.plano,
     diasRestantes: sim.diasRestantes,
     historicoPlanos: hist,
+    cartaoDigitalAtivo: sim.cartaoDigitalAtivo,
     // Reseta a referência da contagem automática para hoje — evita que o
     // próximo carregamento desconte dias "atrasados" sobre o valor que o
     // admin acabou de definir manualmente.
     ultimaAtualizacaoDias: dataDeHojeISO()
   };
-  if (info) atualizacao.valorPlano = info.valor;
+  if (info) {
+    atualizacao.valorPlano = info.valor;
+    atualizacao.modalidade = info.modalidade || null;
+  }
   if (ehPagamentoReal) {
     atualizacao.pagamentoIniciado = true;
     // Ao trocar para um plano pago, garante que o cliente fique ativo
@@ -1441,6 +1516,9 @@ async function renderizarModalRastreamento(eId) {
 
   const comissao = d.comissao || {};
   const planosComissao = ["Mensal", "Anual"];
+  // Preços de referência p/ comissão por empresa — mantidos estáveis mesmo
+  // com a divisão do Mensal em Digital/Físico/Híbrido (comissão é agregada, não por modalidade).
+  const PRECOS_COMISSAO = { Mensal: 19.90, Anual: CATALOGO_PLANOS.anual.valor };
 
   let totalComissaoGeral = 0;
   const linhasComissao = planosComissao.map(plano => {
@@ -1448,7 +1526,7 @@ async function renderizarModalRastreamento(eId) {
     const vendas = Number(c.vendas || 0);
     const percentual = Number(c.percentual || 0);
     const isentas = Number(c.isentas || 0);
-    const valorPlano = CATALOGO_PLANOS[plano]?.valor || 0;
+    const valorPlano = PRECOS_COMISSAO[plano] || 0;
 
     // Só comissiona o que passar do número de vendas isentas configurado
     // pra essa empresa nesse plano. Ex.: 10 isentas, 12 vendas → comissão
